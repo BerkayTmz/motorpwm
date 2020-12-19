@@ -13,4 +13,4 @@ while(1):
    x = 0x00
    serialPort.write(x)
    x = x+1
-   sleep(100);   
+   sleep(100)   
