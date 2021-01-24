@@ -11,17 +11,19 @@ RF = 10
 RR = 15
 LF = 20
 LR = 25
+SPEED = 90
+STOP = 10
+SPEED_TURN = 45
 
 while(1):
    # Wait until there is data waiting in the serial buffer
    # Print the contents of the serial data
    # Tell the device connected over the serial port that we recevied the data!
    # The b at the beginning is used to indicate bytes!
-   with Detector(0, (640, 360)) as d:
+   with Detector(0, None) as d:
       target = None
       while True:
          frame, target, center_x, center_y = d.detect(target)
-         cv2.imshow("hello", frame)
 
          if center_x:
             center_x = int((center_x + 1)*100)
@@ -30,13 +32,13 @@ while(1):
             if(center_y > 30):
                if(center_x < 90): #turn left
                   drive = bytearray()
-                  drive.append(LR)
-                  drive.append(100)
+                  drive.append(LF)
+                  drive.append(SPEED_TURN)
                   serialPort.write(drive)
 
                   drive = bytearray()
                   drive.append(RF)
-                  drive.append(100)
+                  drive.append(SPEED)
                   serialPort.write(drive)
                   print(f"Center: ({center_x}, {center_y})") 
 
@@ -44,36 +46,36 @@ while(1):
                elif(center_x > 110 ): # turn right
                   drive = bytearray()
                   drive.append(LF)
-                  drive.append(100)
+                  drive.append(SPEED)
                   serialPort.write(drive)
 
                   drive = bytearray()
-                  drive.append(RR)
-                  drive.append(100)
+                  drive.append(RF)
+                  drive.append(SPEED_TURN)
                   serialPort.write(drive)
                   print(f"Center: ({center_x}, {center_y})") 
 
                else:
                   drive = bytearray()
                   drive.append(LF)
-                  drive.append(100)
+                  drive.append(SPEED)
                   serialPort.write(drive)
 
                   drive = bytearray()
                   drive.append(RF)
-                  drive.append(100)
+                  drive.append(SPEED)
                   serialPort.write(drive)
                   print(f"Center: ({center_x}, {center_y})") 
          else:
                
             drive = bytearray()
             drive.append(LR)
-            drive.append(0)
+            drive.append(STOP)
             serialPort.write(drive)
 
             drive = bytearray()
             drive.append(RF)
-            drive.append(0)
+            drive.append(STOP)
             serialPort.write(drive)
             print(f"Center: ({center_x}, {center_y})") 
 
