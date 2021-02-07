@@ -9,73 +9,73 @@ serialPort = serial.Serial(port="/dev/ttyUSB0", baudrate=115200,
 
 serialString = ''                           # Used to hold data coming over UART
 
-RF = 10
-RR = 15
-LF = 20
-LR = 25
+
+# Codes to communicate with Arduino to drive individual motors to each direction 
+RIGHT_MOTOR_FORWARD = 10
+RIGHT_MOTOR_REVERSE = 15
+LEFT_MOTOR_FORWARD = 20
+LEFT_MOTOR_REVERSE = 25
+
+
+# Pre-defined motor speeds
+# Values must be between 0-255, this value configures to PWM pulse width 
+DRIVE_SPEED = 90
 STOP = 0
-SPEED = 255
-SPEED_TURN = 45
+TURN_SPEED = 45
+
+def robotDriveArduino(leftMotorDirection, leftMotorSpeed, rightMotorDirection, rightMotorSpeed):
+   drive = bytearray()
+   drive.append(leftMotorDirection)
+   drive.append(leftMotorSpeed)
+   serialPort.write(drive)
+
+   drive = bytearray()
+   drive.append(rightMotorDirection)
+   drive.append(rightMotorSpeed)
+   serialPort.write(drive) 
+
+
+def robotDrive(driveCondition):
+   if(driveCondition == "TURN_LEFT"):
+      # Turn left, slower left motor with turing speed and right motor with normal driving speed
+      robotDriveArduino(LEFT_MOTOR_FORWARD, TURN_SPEED, RIGHT_MOTOR_FORWARD, DRIVE_SPEED)
+
+   elif(driveCondition == "TURN_RIGHT"):
+      # Turn right, slower right motor with turn speed and left motor with normal driving speed 
+      robotDriveArduino(LEFT_MOTOR_FORWARD, DRIVE_SPEED, RIGHT_MOTOR_FORWARD, TURN_SPEED)
+
+   elif(driveCondition == "FORWARD"):
+      # Drive forward, both motors are driven with DRIVE_SPEED in forward direction
+      robotDriveArduino(LEFT_MOTOR_FORWARD, DRIVE_SPEED, RIGHT_MOTOR_FORWARD, DRIVE_SPEED)
+
+   elif(driveCondition == "REVERSE"):
+      # Drive reverse, both motors are driven with DRIVE_SPEED in reverse direction 
+      robotDriveArduino(LEFT_MOTOR_REVERSE, DRIVE_SPEED, RIGHT_MOTOR_REVERSE, DRIVE_SPEED)
+      
+   elif(driveCondition == "STOP"):
+       #STOP, stop signal is send to moth motors  
+      robotDriveArduino(LEFT_MOTOR_FORWARD, STOP, RIGHT_MOTOR_FORWARD, STOP)
+
+   else:
+      robotDriveArduino(LEFT_MOTOR_FORWARD, STOP, RIGHT_MOTOR_FORWARD, STOP)
+
 
 
 def send(char: str):
     if  char == 'a':  # turn left
-        drive = bytearray()
-        drive.append(LF)
-        drive.append(SPEED_TURN)
-        serialPort.write(drive)
-
-        drive = bytearray()
-        drive.append(RF)
-        drive.append(SPEED)
-        serialPort.write(drive)
-        print("turn left")
+        robotDrive("TURN_LEFT")
 
     elif char == 'd':  # turn right
-        drive = bytearray()
-        drive.append(LF)
-        drive.append(SPEED)
-        serialPort.write(drive)
-
-        drive = bytearray()
-        drive.append(RF)
-        drive.append(SPEED_TURN)
-        serialPort.write(drive)
-        print("turn right")
+        robotDrive("TURN_RIGHT")
 
     elif char == 'w':
-        drive = bytearray()
-        drive.append(LF)
-        drive.append(SPEED)
-        serialPort.write(drive)
+        robotDrive("FORWARD")
 
-        drive = bytearray()
-        drive.append(RF)
-        drive.append(SPEED)
-        serialPort.write(drive)
-        print('Drive forward')
     elif char == 's':
-        drive = bytearray()
-        drive.append(LR)
-        drive.append(SPEED)
-        serialPort.write(drive)
+        robotDrive("REVERSE")
 
-        drive = bytearray()
-        drive.append(RR)
-        drive.append(SPEED)
-        serialPort.write(drive)
-        print('Drive backwards')
     elif char == 'q':
-        drive = bytearray()
-        drive.append(LR)
-        drive.append(STOP)
-        serialPort.write(drive)
-
-        drive = bytearray()
-        drive.append(RF)
-        drive.append(STOP)
-        serialPort.write(drive)
-        print("Stop")
+        robotDrive("STOP")
 
 def drive(char: str):
     send(char)
