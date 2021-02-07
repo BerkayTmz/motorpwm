@@ -20,6 +20,35 @@ DRIVE_SPEED = 90
 STOP = 0
 TURN_SPEED = 45
 
+def controller():
+   with Detector(0, None) as d:
+      target = None
+      while True:
+         frame, target, center_x, center_y = d.detect(target)
+
+         if center_x:
+            center_x = int((center_x + 1)*100)
+            center_y = int((center_y + 1)*100)
+            
+            if(center_y > 30):
+               if(center_x < 90): #turn left 
+                  # Turn left, slower left motor with turing speed and right motor with normal driving speed
+                  #robotDriveArduino(LEFT_MOTOR_FORWARD, TURN_SPEED, RIGHT_MOTOR_FORWARD, DRIVE_SPEED)
+                  robotDrive("TURN_LEFT")
+
+               elif(center_x > 110 ): # turn right
+                  # Turn right, slower right motor with turn speed and left motor with normal driving speed 
+                  #robotDriveArduino(LEFT_MOTOR_FORWARD, DRIVE_SPEED, RIGHT_MOTOR_FORWARD, TURN_SPEED)
+                  robotDrive("TURN_RIGHT")
+               else:
+                  # Drive forward, this condition is only happens when the 
+                  # robotDriveArduino(LEFT_MOTOR_FORWARD, DRIVE_SPEED, RIGHT_MOTOR_FORWARD, DRIVE_SPEED)
+                  robotDrive("DRIVE_FORWARD")
+         else: 
+            # STOP, stop signal is send to moth motors  
+            # robotDriveArduino(LEFT_MOTOR_REVERSE, STOP, RIGHT_MOTOR_FORWARD, STOP)
+            robotDrive("STOP")
+            
 def robotDriveArduino(leftMotorDirection, leftMotorSpeed, rightMotorDirection, rightMotorSpeed):
    drive = bytearray()
    drive.append(leftMotorDirection)
@@ -57,34 +86,7 @@ def robotDrive(driveCondition):
    else:
       robotDriveArduino(LEFT_MOTOR_FORWARD, STOP, RIGHT_MOTOR_FORWARD, STOP)
 
-def controller():
-   with Detector(0, None) as d:
-      target = None
-      while True:
-         frame, target, center_x, center_y = d.detect(target)
 
-         if center_x:
-            center_x = int((center_x + 1)*100)
-            center_y = int((center_y + 1)*100)
-            
-            if(center_y > 30):
-               if(center_x < 90): #turn left 
-                  # Turn left, slower left motor with turing speed and right motor with normal driving speed
-                  #robotDriveArduino(LEFT_MOTOR_FORWARD, TURN_SPEED, RIGHT_MOTOR_FORWARD, DRIVE_SPEED)
-                  robotDrive("TURN_LEFT")
-
-               elif(center_x > 110 ): # turn right
-                  # Turn right, slower right motor with turn speed and left motor with normal driving speed 
-                  #robotDriveArduino(LEFT_MOTOR_FORWARD, DRIVE_SPEED, RIGHT_MOTOR_FORWARD, TURN_SPEED)
-                  robotDrive("TURN_RIGHT")
-               else:
-                  # Drive forward, this condition is only happens when the 
-                  # robotDriveArduino(LEFT_MOTOR_FORWARD, DRIVE_SPEED, RIGHT_MOTOR_FORWARD, DRIVE_SPEED)
-                  robotDrive("DRIVE_FORWARD")
-         else: 
-            # STOP, stop signal is send to moth motors  
-            # robotDriveArduino(LEFT_MOTOR_REVERSE, STOP, RIGHT_MOTOR_FORWARD, STOP)
-            robotDrive("STOP")
 
 
 
