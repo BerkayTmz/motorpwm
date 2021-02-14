@@ -12,7 +12,7 @@ RR = 15
 LF = 20
 LR = 25
 SPEED = 90
-STOP = 10
+STOP = 0
 SPEED_TURN = 45
 
 while(1):
@@ -20,10 +20,10 @@ while(1):
    # Print the contents of the serial data
    # Tell the device connected over the serial port that we recevied the data!
    # The b at the beginning is used to indicate bytes!
-   with Detector(0, None) as d:
-      target = None
+   with Detector(0, (640,480)) as detector:
+      target, target_type = None, None
       while True:
-         frame, target, center_x, center_y = d.detect(target)
+         frame, target, target_type, center_x, center_y = detector.detect(target, target_type)
 
          if center_x:
             center_x = int((center_x + 1)*100)

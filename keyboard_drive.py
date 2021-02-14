@@ -19,7 +19,7 @@ LEFT_MOTOR_REVERSE = 25
 
 # Pre-defined motor speeds
 # Values must be between 0-255, this value configures to PWM pulse width 
-DRIVE_SPEED = 90
+DRIVE_SPEED = 255
 STOP = 0
 TURN_SPEED = 45
 
@@ -38,11 +38,11 @@ def robotDriveArduino(leftMotorDirection, leftMotorSpeed, rightMotorDirection, r
 def robotDrive(driveCondition):
    if(driveCondition == "TURN_LEFT"):
       # Turn left, slower left motor with turing speed and right motor with normal driving speed
-      robotDriveArduino(LEFT_MOTOR_FORWARD, TURN_SPEED, RIGHT_MOTOR_FORWARD, DRIVE_SPEED)
+      robotDriveArduino(LEFT_MOTOR_REVERSE, DRIVE_SPEED, RIGHT_MOTOR_FORWARD, DRIVE_SPEED)
 
    elif(driveCondition == "TURN_RIGHT"):
       # Turn right, slower right motor with turn speed and left motor with normal driving speed 
-      robotDriveArduino(LEFT_MOTOR_FORWARD, DRIVE_SPEED, RIGHT_MOTOR_FORWARD, TURN_SPEED)
+      robotDriveArduino(LEFT_MOTOR_FORWARD, DRIVE_SPEED, RIGHT_MOTOR_REVERSE, DRIVE_SPEED)
 
    elif(driveCondition == "FORWARD"):
       # Drive forward, both motors are driven with DRIVE_SPEED in forward direction

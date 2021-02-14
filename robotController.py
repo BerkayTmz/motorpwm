@@ -1,6 +1,5 @@
 import serial
-from detector import Detector
-import cv2
+from detector import Detector, TargetType
 
 serialPort = serial.Serial(port = "/dev/ttyUSB0", baudrate=115200,
                            bytesize=8, timeout=2, stopbits=serial.STOPBITS_ONE)
@@ -75,19 +74,15 @@ def controller(frame, target, center_x, center_y):
                else:
                   # Drive forward, this condition is only happens when the 
                   # robotDriveArduino(LEFT_MOTOR_FORWARD, DRIVE_SPEED, RIGHT_MOTOR_FORWARD, DRIVE_SPEED)
-                  robotDrive("DRIVE_FORWARD")
+                  robotDrive("FORWARD")
          else: 
             # STOP, stop signal is send to moth motors  
             # robotDriveArduino(LEFT_MOTOR_REVERSE, STOP, RIGHT_MOTOR_FORWARD, STOP)
             robotDrive("STOP")
 
-with Detector(0, None) as d:
-   target = None
-
-while True:
-   frame, target, center_x, center_y = d.detect(target)
-   controller(frame, target, center_x, center_y)
-   
-   
-
-
+with Detector(0, (640,480)) as detector:
+   target, target_type = None, None
+   while True:
+      frame, target, target_type, center_x, center_y = detector.detect(target, target_type)
+      controller(frame, target, center_x, center_y)
+      
