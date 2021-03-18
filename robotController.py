@@ -96,4 +96,7 @@ with Detector(0, (640,480)) as detector:
          if cv2.waitKey(1) == 27:
             break
       controller(frame, target, center_x, center_y)
-      
+
+# Use the code below for converting frame to bytes 
+# ret, buf = cv2.imencode(".jpg", frame)
+# buf_bytes = buf.tobytes()
