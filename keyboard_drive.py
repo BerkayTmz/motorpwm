@@ -3,6 +3,13 @@ from detector import Detector
 import cv2
 import keyboard
 from time import sleep
+import argparse
+from concurrent.futures import ProcessPoolExecutor
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-d", "--display", help="display camera feed",
+                    action="store_true")
+args = parser.parse_args()
 
 serialPort = serial.Serial(port="/dev/ttyUSB0", baudrate=115200,
                            bytesize=8, timeout=2, stopbits=serial.STOPBITS_ONE)
@@ -88,8 +95,23 @@ keyboard.add_hotkey('a', drive, args=('a'))
 keyboard.add_hotkey('d', drive, args=('d'))
 keyboard.add_hotkey('q', drive, args=('q'))
 
+def keyboard_control():
+    try:
+        keyboard.wait()
+    except:
+        drive('q')
 
-try:
-    keyboard.wait()
-except:
-    drive('q')
+def display_camera_feed():
+    cap = cv2.VideoCapture(0)
+    while True:
+        ret, frame = cap.read()
+        cv2.imshow("Display", frame)
+        if cv2.waitKey(1) == 27:
+            break
+
+if args.display:
+    with ProcessPoolExecutor(max_workers=2) as executor:
+        executor.submit(display_camera_feed)
+        executor.submit(keyboard_control)
+else:
+    keyboard_control()

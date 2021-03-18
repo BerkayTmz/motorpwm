@@ -1,5 +1,12 @@
 import serial
 from detector import Detector, TargetType
+import argparse
+import cv2
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-d", "--display", help="display camera feed",
+                    action="store_true")
+args = parser.parse_args()
 
 serialPort = serial.Serial(port = "/dev/ttyUSB0", baudrate=115200,
                            bytesize=8, timeout=2, stopbits=serial.STOPBITS_ONE)
@@ -84,5 +91,9 @@ with Detector(0, (640,480)) as detector:
    target, target_type = None, None
    while True:
       frame, target, target_type, center_x, center_y = detector.detect(target, target_type)
+      if args.display:
+         cv2.imshow("Display", frame)
+         if cv2.waitKey(1) == 27:
+            break
       controller(frame, target, center_x, center_y)
       
