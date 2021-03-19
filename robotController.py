@@ -2,9 +2,17 @@ import serial
 from detector import Detector, TargetType
 import argparse
 import cv2
+from serial import Serial
+import base64
+import redis
+
+client = redis.Redis()
+pubsub = client.pubsub()
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-d", "--display", help="display camera feed",
+                    action="store_true")
+parser.add_argument("-s", "--serial", help="start serial communication with ESP",
                     action="store_true")
 args = parser.parse_args()
 
@@ -22,9 +30,9 @@ LEFT_MOTOR_REVERSE = 25
 
 # Pre-defined motor speeds
 # Values must be between 0-255, this value configures to PWM pulse width 
-DRIVE_SPEED = 90
+DRIVE_SPEED = 100
 STOP = 0
-TURN_SPEED = 45
+TURN_SPEED = 70 
 
 def robotDriveArduino(leftMotorDirection, leftMotorSpeed, rightMotorDirection, rightMotorSpeed):
    drive = bytearray()
@@ -87,16 +95,23 @@ def controller(frame, target, center_x, center_y):
             # robotDriveArduino(LEFT_MOTOR_REVERSE, STOP, RIGHT_MOTOR_FORWARD, STOP)
             robotDrive("STOP")
 
+def serial_comm(frame):
+   resized = cv2.resize(frame, (80, 60))
+   retval, buf = cv2.imencode('.jpg', resized)
+   content = buf.tobytes()
+   to_write = base64.b64encode(content) 
+      
+   client.set("serial_image", to_write)
+
 with Detector(0, (640,480)) as detector:
    target, target_type = None, None
    while True:
       frame, target, target_type, center_x, center_y = detector.detect(target, target_type)
+      if args.serial:
+         serial_comm(frame)
       if args.display:
          cv2.imshow("Display", frame)
          if cv2.waitKey(1) == 27:
             break
       controller(frame, target, center_x, center_y)
-
-# Use the code below for converting frame to bytes 
-# ret, buf = cv2.imencode(".jpg", frame)
-# buf_bytes = buf.tobytes()
+      
