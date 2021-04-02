@@ -30,9 +30,9 @@ LEFT_MOTOR_REVERSE = 25
 
 # Pre-defined motor speeds
 # Values must be between 0-255, this value configures to PWM pulse width
-DRIVE_SPEED = 100
+DRIVE_SPEED = 120
 STOP = 0
-TURN_SPEED = 70
+TURN_SPEED = 80
 
 
 def robotDriveArduino(leftMotorDirection, leftMotorSpeed, rightMotorDirection, rightMotorSpeed):
@@ -77,7 +77,6 @@ def robotDrive(driveCondition):
 
 
 def controller(frame, target, center_x, center_y, min_dist):
-
     if center_x and (min_dist == 0 or min_dist >= 300):
         center_x = int((center_x + 1)*100)
         center_y = int((center_y + 1)*100)
@@ -113,10 +112,11 @@ def serial_comm(frame):
 
 with Detector(0, (640, 480)) as detector:
     target, target_type = None, None
-    min_dist = int(client.get("min"))
     while True:
         frame, target, target_type, center_x, center_y = detector.detect(
             target, target_type)
+        min_dist = client.get("min")
+        min_dist = 0 if min_dist is None else float(min_dist)
         if args.serial:
             serial_comm(frame)
         if args.display:
