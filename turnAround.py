@@ -6,6 +6,8 @@ from serial import Serial
 import base64
 import redis
 import time
+from enum import Enum, auto
+
 
 client = redis.Redis()
 pubsub = client.pubsub()
@@ -21,6 +23,14 @@ state = 0
 cntr = 1
 start_time = time.time()
 cooldown = time.time()
+
+# AMK Case'i algorithm metadata [DON'T MODIFY]
+class Case(Enum):
+    NONAMK = auto()
+    AMK = auto()
+
+Case = Case.NONAMK
+
 
 
 parser = argparse.ArgumentParser()
@@ -103,52 +113,56 @@ def robotDrive(driveCondition):
         robotDriveArduino(LEFT_MOTOR_FORWARD, STOP, RIGHT_MOTOR_FORWARD, STOP)
 
 def search():
-    global state_changed, state, cntr, start_time, cooldown
+    global state_changed, state, cntr, start_time, cooldown, Case
 
-    if state_changed == 1:
-        cooldown = time.time() + 1
-        state_changed = 2
-        return
-    elif state_changed == 2:
-        start_time = time.time()
-        state_changed = 0
-    
-    if state == 0:
-        if time.time() < start_time + (cntr*FORWARD_BASE_TIME*T):
-            robotDrive("FORWARD")
-        else:
-            state += 1
-            state_changed = 1
+    if Case == Case.NONAMK:
+        if state_changed == 1:
+            cooldown = time.time() + 1
+            state_changed = 2
+            return
+        elif state_changed == 2:
+            start_time = time.time()
+            state_changed = 0
+        
+        if state == 0:
+            if time.time() < start_time + (cntr*FORWARD_BASE_TIME*T):
+                robotDrive("FORWARD")
+            else:
+                state += 1
+                state_changed = 1
 
-    elif state == 1:
-        if time.time() < start_time + (TURN_BASE_TIME*T):
-            robotDrive("TURN_LEFT")
-        else:
-            state += 1
-            state_changed = 1
+        elif state == 1:
+            if time.time() < start_time + (TURN_BASE_TIME*T):
+                robotDrive("TURN_LEFT")
+            else:
+                state += 1
+                state_changed = 1
 
-    elif state == 2:
-        if time.time() < start_time + (cntr*FORWARD_BASE_TIME*T):
-            robotDrive("FORWARD")
-        else:
-            state += 1
-            state_changed = 1
+        elif state == 2:
+            if time.time() < start_time + (cntr*FORWARD_BASE_TIME*T):
+                robotDrive("FORWARD")
+            else:
+                state += 1
+                state_changed = 1
 
-    elif state == 3:
-        if time.time() < start_time + (TURN_BASE_TIME*T):
-            robotDrive("TURN_LEFT")
-        else:
-            state = 0
-            cntr += 1
-            state_changed = 1
+        elif state == 3:
+            if time.time() < start_time + (TURN_BASE_TIME*T):
+                robotDrive("TURN_LEFT")
+            else:
+                state = 0
+                cntr += 1
+                state_changed = 1
+    elif Case == Case.AMK:
+        x = 1
 
 
 
 def controller(frame, target, center_x, center_y, min_dist):
-    global state_changed, state, cntr, start_time, cooldown
+    global state_changed, state, cntr, start_time, cooldown, Case
     min_dist = 400
     if (min_dist != 0 and min_dist < 300):
         robotDrive("STOP")
+        Case = Case.AMK
         return
     else:
         if center_x:    

@@ -26,7 +26,7 @@ LEFT_MOTOR_REVERSE = 25
 
 # Pre-defined motor speeds
 # Values must be between 0-255, this value configures to PWM pulse width 
-DRIVE_SPEED = 255
+DRIVE_SPEED = 90
 STOP = 0
 TURN_SPEED = 45
 
