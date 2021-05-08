@@ -133,6 +133,7 @@ def init_mode_params(mode: str):
 def lidar_distance(direction: str):
     min_dist = client.get(direction)
     min_dist = None if min_dist is None else float(min_dist)
+    return min_dist
 
 
 def cooldown(cd: float = None):
@@ -141,6 +142,24 @@ def cooldown(cd: float = None):
         return (cooldown_until > time.time())
     else:
         cooldown_until = time.time() + cd
+
+
+def nextState(mode: str):
+    if mode == "s":
+        global s_state, s_state_changed, s_cntr
+        s_state += 1
+        if s_state > 3:
+            s_state = 0
+            s_cntr += 1
+        cooldown(1)
+        s_state_changed = True
+    elif mode == "o":
+        global o_state, o_state_changed
+        o_state += 1
+        if o_state > 6:
+            o_state = 0
+        cooldown(1)
+        o_state_changed = True
 
 
 def rush(frame, target, center_x, center_y, min_dist):
@@ -179,92 +198,83 @@ def rush(frame, target, center_x, center_y, min_dist):
 
 
 def obstacleAvoidance():
-    global o_state_changed, o_state, o_start_time, o_down_start
+    global o_state_changed, o_state, o_start_time, o_down_start, Mode
 
     first_entrance_for_this_state = False
-    if not cooldown():
-        if o_state_changed:
-            o_start_time = time.time()
-            o_state_changed = False
-            first_entrance_for_this_state = True
-
-        if o_state == 0:
-            if time.time() < o_start_time + (TURN_BASE_TIME*T):
-                robotDrive("TURN_LEFT")
-            else:
-                nextState("o")
-                return
-
-        elif o_state == 1:
-            r = lidar_distance("r")
-            # and time.time() < o_start_time + searchtengelen:
-            if r and r < obstacle_avoided_dist:
-                robotDrive("FORWARD")
-                if first_entrance_for_this_state:
-                    o_down_start = time.time()
-            else:
-                nextState("o")
-                y = time.time() - o_down_start
-                return
-
-        elif o_state == 2:
-            if time.time() < o_start_time + (TURN_BASE_TIME*T):
-                robotDrive("TURN_RIGHT")
-            else:
-                nextState("o")
-                return
-
-        elif o_state == 3:
-            r = lidar_distance("r")
-            # and time.time() < o_start_time + searchtengelen:
-            if r and r < obstacle_avoided_dist:
-                robotDrive("FORWARD")
-            else:
-                nextState("o")
-                return
-
-        elif o_state == 4:
-            if time.time() < o_start_time + (TURN_BASE_TIME*T):
-                robotDrive("TURN_RIGHT")
-            else:
-                nextState("o")
-                return
-
-        elif o_state == 5:
-            r = lidar_distance("r")
-            # and time.time() < o_start_time + searchtengelen:
-            if time.time() < o_start_time + y:
-                robotDrive("FORWARD")
-            else:
-                nextState("o")
-                return
-
-        elif o_state == 6:
-            if time.time() < o_start_time + (TURN_BASE_TIME*T):
-                robotDrive("TURN_LEFT")
-            else:
-                nextState("o")
-                Mode = Mode.Search
-                init_mode_params("o")
-                return
 
 
-def nextState(mode: str):
-    if mode == "s":
-        global s_state, s_state_changed, s_cntr
-        s_state += 1
-        if s_state > 3:
-            s_state = 0
-            s_cntr += 1
-        cooldown(1)
-        s_state_changed = True
-    elif mode == "o":
-        global o_state, o_state_changed
-        o_state += 1
-        if o_state > 6:
-            o_state = 0
-        cooldown(1)
-        o_state_changed = True
+    if cooldown():
+        return
+    
+    # Execute obstacle avoidance algorithm
+    if o_state_changed:
+        o_start_time = time.time()
+        o_state_changed = False
+        first_entrance_for_this_state = True
+
+    if o_state == 0:
+        if time.time() < o_start_time + (TURN_BASE_TIME*T):
+            robotDrive("TURN_LEFT")
+        else:
+            nextState("o")
+            return
+
+    elif o_state == 1:
+        r = lidar_distance("r")
+        # and time.time() < o_start_time + searchtengelen:
+        if r and r < obstacle_avoided_dist:
+            robotDrive("FORWARD")
+            if first_entrance_for_this_state:
+                o_down_start = time.time()
+        else:
+            nextState("o")
+            y = time.time() - o_down_start
+            return
+
+    elif o_state == 2:
+        if time.time() < o_start_time + (TURN_BASE_TIME*T):
+            robotDrive("TURN_RIGHT")
+        else:
+            nextState("o")
+            return
+    
+# Araya state ekle default bir süre gitsin (1 metre götürcek kadar mesela)
+# x initialize et, yatay gittiğin yolu ölç [gerekirse]
+
+    elif o_state == 3:
+        r = lidar_distance("r")
+        # and time.time() < o_start_time + searchtengelen:
+        if r and r < obstacle_avoided_dist:
+            robotDrive("FORWARD")
+        else:
+            nextState("o")
+            return
+
+    elif o_state == 4:
+        if time.time() < o_start_time + (TURN_BASE_TIME*T):
+            robotDrive("TURN_RIGHT")
+        else:
+            nextState("o")
+            return
+
+    elif o_state == 5:
+        r = lidar_distance("r")
+        # and time.time() < o_start_time + searchtengelen:
+        if time.time() < o_start_time + y:
+            robotDrive("FORWARD")
+        else:
+            nextState("o")
+            return
+
+    elif o_state == 6:
+        if time.time() < o_start_time + (TURN_BASE_TIME*T):
+            robotDrive("TURN_LEFT")
+        else:
+            nextState("o")
+            Mode = Mode.Search
+            init_mode_params("o")
+            return
+
 
 
 def search():
@@ -277,38 +287,41 @@ def search():
         cooldown(1)
         return
 
-    if not cooldown():
-        if s_state_changed:
-            s_start_time = time.time()
-            s_state_changed = False
+    if cooldown():
+        return
 
-        if s_state == 0:
-            if time.time() < s_start_time + (s_cntr*FORWARD_BASE_TIME*T):
-                robotDrive("FORWARD")
-            else:
-                nextState("s")
-                return
+    # Execute search algorithm
+    if s_state_changed:
+        s_start_time = time.time()
+        s_state_changed = False
 
-        elif s_state == 1:
-            if time.time() < s_start_time + (TURN_BASE_TIME*T):
-                robotDrive("TURN_LEFT")
-            else:
-                nextState("s")
-                return
+    if s_state == 0:
+        if time.time() < s_start_time + (s_cntr*FORWARD_BASE_TIME*T):
+            robotDrive("FORWARD")
+        else:
+            nextState("s")
+            return
 
-        elif s_state == 2:
-            if time.time() < s_start_time + (s_cntr*FORWARD_BASE_TIME*T):
-                robotDrive("FORWARD")
-            else:
-                nextState("s")
-                return
+    elif s_state == 1:
+        if time.time() < s_start_time + (TURN_BASE_TIME*T):
+            robotDrive("TURN_LEFT")
+        else:
+            nextState("s")
+            return
 
-        elif s_state == 3:
-            if time.time() < s_start_time + (TURN_BASE_TIME*T):
-                robotDrive("TURN_LEFT")
-            else:
-                nextState("s")
-                return
+    elif s_state == 2:
+        if time.time() < s_start_time + (s_cntr*FORWARD_BASE_TIME*T):
+            robotDrive("FORWARD")
+        else:
+            nextState("s")
+            return
+
+    elif s_state == 3:
+        if time.time() < s_start_time + (TURN_BASE_TIME*T):
+            robotDrive("TURN_LEFT")
+        else:
+            nextState("s")
+            return
 
 
 def controller(frame, target, center_x, center_y, min_dist):
