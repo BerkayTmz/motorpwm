@@ -31,7 +31,7 @@ LEFT_MOTOR_REVERSE = 25
 DRIVE_SPEED = 70
 STOP = 0
 DRIVE_TURN_SPEED = 45
-TURN_SPEED = 120
+TURN_SPEED = 90
 
 # Search algorithm state data [DON'T MODIFY]
 s_state_changed = True
