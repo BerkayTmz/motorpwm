@@ -20,10 +20,10 @@ stop_distance = 400             # millimeters
 obstacle_avoided_dist = 1000    # millimeters
 
 # Codes to communicate with Arduino to drive individual motors to each direction
-RIGHT_MOTOR_FORWARD = 10
-RIGHT_MOTOR_REVERSE = 15
-LEFT_MOTOR_FORWARD = 20
-LEFT_MOTOR_REVERSE = 25
+RIGHT_MOTOR_FORWARD = 20
+RIGHT_MOTOR_REVERSE = 25
+LEFT_MOTOR_FORWARD = 10
+LEFT_MOTOR_REVERSE = 15
 
 
 # Pre-defined motor speeds
