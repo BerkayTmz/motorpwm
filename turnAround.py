@@ -45,6 +45,7 @@ o_state_changed = True
 o_state = 0
 o_start_time = time.time()
 o_down_start = time.time()
+y = 0
 
 
 class Mode(Enum):
@@ -131,7 +132,7 @@ def init_mode_params(mode: str):
 
 
 def lidar_distance(direction: str):
-    min_dist = client.get(direction)
+    min_dist = client.get(f'{direction}:dist')
     min_dist = None if min_dist is None else float(min_dist)
     return min_dist
 
@@ -198,7 +199,7 @@ def rush(frame, target, center_x, center_y, min_dist):
 
 
 def obstacleAvoidance():
-    global o_state_changed, o_state, o_start_time, o_down_start, Mode
+    global o_state_changed, o_state, o_start_time, o_down_start, Mode, y
 
     first_entrance_for_this_state = False
 
@@ -278,7 +279,7 @@ def obstacleAvoidance():
 
 
 def search():
-    global s_state_changed, s_state, s_cntr, s_start_time, stop_distance
+    global s_state_changed, s_state, s_cntr, s_start_time, stop_distance, Mode
 
     f = lidar_distance("f")
     if f and f < stop_distance:
@@ -325,7 +326,7 @@ def search():
 
 
 def controller(frame, target, center_x, center_y, min_dist):
-
+    global Mode
     # Adjust Mode
     if center_x:
         Mode = Mode.Rush
