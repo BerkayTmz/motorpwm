@@ -9,14 +9,15 @@ import redis
 import time
 from enum import Enum, auto
 
+
 client = redis.Redis()
 pubsub = client.pubsub()
 
 # search algorithm parameters
-TURN_BASE_TIME = 0.4            # seconds
+TURN_BASE_TIME = 0.75           # seconds
 FORWARD_BASE_TIME = 1           # seconds
 T = 1                           # unitless
-stop_distance = 400             # millimeters
+stop_distance = 1000             # millimeters
 obstacle_avoided_dist = 1000    # millimeters
 
 # Codes to communicate with Arduino to drive individual motors to each direction
@@ -28,10 +29,10 @@ LEFT_MOTOR_REVERSE = 25
 
 # Pre-defined motor speeds
 # Values must be between 0-255, this value configures to PWM pulse width
-DRIVE_SPEED = 70
+DRIVE_SPEED = 110
 STOP = 0
-DRIVE_TURN_SPEED = 45
-TURN_SPEED = 80
+DRIVE_TURN_SPEED = 70
+TURN_SPEED = 100
 
 # Search algorithm state data [DON'T MODIFY]
 s_state_changed = True
@@ -205,6 +206,7 @@ def obstacleAvoidance():
 
 
     if cooldown():
+        robotDrive("STOP")
         return
     
     # Execute obstacle avoidance algorithm
@@ -289,6 +291,7 @@ def search():
         return
 
     if cooldown():
+        robotDrive("STOP")
         return
 
     # Execute search algorithm

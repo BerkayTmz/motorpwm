@@ -26,9 +26,9 @@ LEFT_MOTOR_REVERSE = 25
 
 # Pre-defined motor speeds
 # Values must be between 0-255, this value configures to PWM pulse width 
-DRIVE_SPEED = 90
+DRIVE_SPEED = 100
 STOP = 0
-TURN_SPEED = 45
+TURN_SPEED = 70
 
 def robotDriveArduino(leftMotorDirection, leftMotorSpeed, rightMotorDirection, rightMotorSpeed):
    drive = bytearray()
