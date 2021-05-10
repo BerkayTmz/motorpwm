@@ -17,7 +17,7 @@ pubsub = client.pubsub()
 TURN_BASE_TIME = 0.75           # seconds
 FORWARD_BASE_TIME = 1           # seconds
 T = 1                           # unitless
-stop_distance = 1000             # millimeters
+stop_distance = 700             # millimeters
 obstacle_avoided_dist = 1000    # millimeters
 
 # Codes to communicate with Arduino to drive individual motors to each direction
@@ -164,7 +164,7 @@ def nextState(mode: str):
         o_state_changed = True
 
 
-def rush(frame, target, center_x, center_y, min_dist):
+def rush(center_x, center_y):
     global stop_distance
 
     f = lidar_distance("f")
@@ -173,16 +173,18 @@ def rush(frame, target, center_x, center_y, min_dist):
         return
     elif center_x:
         center_x = int((center_x + 1)*100)
-        center_y = int((center_y + 1)*100)
+
+        if center_y:
+            center_y = int((center_y + 1)*100)
+            if center_y < 40:
+                robotDrive("STOP")
+                return
 
         # s_state_changed = 2
         # s_state = 0
         # s_cntr = 1
         # s_start_time = time.time()
 
-        if center_y < 40:
-            robotDrive("STOP")
-            return
         else:
             if(center_x < 90):  # turn left
                 # Turn left, slower left motor with turing speed and right motor with normal driving speed
@@ -204,11 +206,10 @@ def obstacleAvoidance():
 
     first_entrance_for_this_state = False
 
-
     if cooldown():
         robotDrive("STOP")
         return
-    
+
     # Execute obstacle avoidance algorithm
     if o_state_changed:
         o_start_time = time.time()
@@ -240,7 +241,7 @@ def obstacleAvoidance():
         else:
             nextState("o")
             return
-    
+
 # Araya state ekle default bir süre gitsin (1 metre götürcek kadar mesela)
 # x initialize et, yatay gittiğin yolu ölç [gerekirse]
 
@@ -277,7 +278,6 @@ def obstacleAvoidance():
             Mode = Mode.Search
             init_mode_params("o")
             return
-
 
 
 def search():
@@ -328,7 +328,7 @@ def search():
             return
 
 
-def controller(frame, target, center_x, center_y, min_dist):
+def controller(center_x, center_y):
     global Mode
     # Adjust Mode
     if center_x:
@@ -336,7 +336,7 @@ def controller(frame, target, center_x, center_y, min_dist):
 
     # Execute Mode
     if Mode == Mode.Rush:
-        rush(frame, target, center_x, center_y, min_dist)
+        rush(center_x, center_y)
     elif Mode == Mode.Search:
         search()
     elif Mode == Mode.ObstacleAvoidance:
@@ -345,26 +345,20 @@ def controller(frame, target, center_x, center_y, min_dist):
         robotDrive("STOP")
 
 
-def serial_comm(frame):
-    resized = cv2.resize(frame, (80, 60))
-    retval, buf = cv2.imencode('.jpg', resized)
-    content = buf.tobytes()
-    to_write = base64.b64encode(content)
+while True:
+    center_x, center_y = client.get("center:x"), client.get("center:y")
 
-    client.set("serial_image", to_write)
+    center_x = None if center_x is None else float(center_x)
+    center_y = None if center_y is None else float(center_y)
 
+    if center_x is not None and center_y is None:
+        print(f"{center_x:0.3f} SICTIIIN             ", end="\r")
+    else:
+        print(f"{None}              ", end="\r")
 
-with Detector(0, (640, 360)) as detector:
-    target, target_type = None, None
-    while True:
-        frame, target, target_type, center_x, center_y = detector.detect(
-            target, target_type)
-        min_dist = client.get("min")
-        min_dist = 0 if min_dist is None else float(min_dist)
-        if args.serial:
-            serial_comm(frame)
-        if args.display:
-            cv2.imshow("Display", frame)
-            if cv2.waitKey(1) == 27:
-                break
-        controller(frame, target, center_x, center_y, min_dist)
+    if center_y is not None:
+        print(f"{center_y:0.3f}              ", end="\r")
+    else:
+        print(f"{None}              ", end="\r")
+
+    controller(center_x, center_y)
