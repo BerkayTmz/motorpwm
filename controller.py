@@ -19,17 +19,22 @@ client = redis.Redis()
 rush_stop_distance = 550
 
 # search algorithm parameters
-TURN_BASE_TIME = 0.50           # seconds
-FORWARD_BASE_TIME = 1           # seconds
-T = 1                           # unitless
-search_stop_distance = 700      # millimeters
-obstacle_avoided_dist = 1000    # millimeters
+TURN_BASE_TIME = 0.50                  # seconds
+FORWARD_BASE_TIME = 1                  # seconds
+T = 1                                  # unitless
+obstacle_seen_stop_distance = 700      # millimeters
+obstacle_avoided_dist = 1000           # millimeters
+side_obstacle_seen_stop_distance = 350 # millimeters
+
+# Obctacle avoidance algorithm parameters
+lidar_active = True
+
 
 # Codes to communicate with Arduino to drive individual motors to each direction
-RIGHT_MOTOR_FORWARD = 20
-RIGHT_MOTOR_REVERSE = 25
-LEFT_MOTOR_FORWARD = 10
-LEFT_MOTOR_REVERSE = 15
+RIGHT_MOTOR_FORWARD = 10
+RIGHT_MOTOR_REVERSE = 15
+LEFT_MOTOR_FORWARD = 20
+LEFT_MOTOR_REVERSE = 25
 
 
 # Pre-defined motor speeds
@@ -177,6 +182,8 @@ def nextState(mode: str, add_cooldown: bool = True, cooldown_amount: float = 1):
 
     if add_cooldown:
         cooldown(cooldown_amount)
+    
+    lidar_active = True
 
 
 def rush(center_x, center_y):
@@ -216,7 +223,7 @@ def rush(center_x, center_y):
 
 
 def obstacleAvoidance():
-    global o_state_changed, o_state, o_start_time, o_down_start, Mode, y
+    global o_state_changed, o_state, o_start_time, o_down_start, Mode, y, obstacle_seen_stop_distance, lidar_active
 
     first_entrance_for_this_state = False
 
@@ -224,11 +231,24 @@ def obstacleAvoidance():
         robotDrive("STOP")
         return
 
+    if lidar_active:
+        f = lidar_distance("f")
+        fr = lidar_distance("fr")
+        fl = lidar_distance("fl")
+        if (f and f < obstacle_seen_stop_distance) or (fr and fr < side_obstacle_seen_stop_distance) or (fl and fl < side_obstacle_seen_stop_distance):
+            robotDrive("STOP")
+            Mode = Mode.ObstacleAvoidance
+            lidar_active = False
+            init_mode_params("o")
+            cooldown(1)
+            return
+
     # Execute obstacle avoidance algorithm
     if o_state_changed:
         o_start_time = time.time()
         o_state_changed = False
         first_entrance_for_this_state = True
+        
 
     if o_state == 0:
         if time.time() < o_start_time + (TURN_BASE_TIME*T):
@@ -301,10 +321,12 @@ def obstacleAvoidance():
 
 
 def search():
-    global s_state_changed, s_state, s_cntr, s_start_time, search_stop_distance, Mode
+    global s_state_changed, s_state, s_cntr, s_start_time, obstacle_seen_stop_distance, Mode
 
     f = lidar_distance("f")
-    if f and f < search_stop_distance:
+    fr = lidar_distance("fr")
+    fl = lidar_distance("fl")
+    if (f and f < obstacle_seen_stop_distance) or (fr and fr < side_obstacle_seen_stop_distance) or (fl and fl < side_obstacle_seen_stop_distance):
         robotDrive("STOP")
         Mode = Mode.ObstacleAvoidance
         cooldown(1)
@@ -372,7 +394,9 @@ while True:
     center_x = None if center_x is None else float(center_x)
     center_y = None if center_y is None else float(center_y)
 
-    print(str(Mode) + "                  ", end="\r")
+    # Use this while being able to see the screen for debugging purposes
+    print(str(Mode) + "    f: " + str(lidar_distance("f")) + "    r: " + str(lidar_distance("r")) + "                  ", end="\r")
+
 
     # if center_x is not None and center_y is None:
     #     print(f"{center_x:0.3f} SICTIIIN             ", end="\r")
