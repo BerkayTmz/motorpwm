@@ -4,7 +4,7 @@ import argparse
 import cv2
 from serial import Serial
 from serial.tools import list_ports
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
 import base64
 import redis
 
@@ -19,12 +19,12 @@ parser.add_argument("-s", "--serial", help="start serial communication with ESP"
 args = parser.parse_args()
 
 # Auto Serial Port Finding
-def get_device_com(comports, vid_pid_tuple: Tuple[int, int]):
+def get_device_com(comports, vid_pid_tuple: List[Tuple[int, int]]):
     device_com = [com.device for com in comports
-                  if (com.vid, com.pid) == vid_pid_tuple]
+                  if (com.vid, com.pid) in vid_pid_tuple]
     return device_com[0] if len(device_com) else None
 
-ARDU_VID_PID = (1027, 24577)
+ARDU_VID_PID = [(1027, 24577), (9025, 66)]
 comports = list(list_ports.comports())
 ardu_dev_com = get_device_com(comports, ARDU_VID_PID)
 serialPort = serial.Serial(port=ardu_dev_com, baudrate=115200,
