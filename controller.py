@@ -24,7 +24,7 @@ FORWARD_BASE_TIME = 1                  # seconds
 T = 1                                  # unitless
 obstacle_seen_stop_distance = 700      # millimeters
 obstacle_avoided_dist = 1000           # millimeters
-side_obstacle_seen_stop_distance = 350 # millimeters
+side_obstacle_seen_stop_distance = 350  # millimeters
 
 # Obctacle avoidance algorithm parameters
 lidar_active = True
@@ -43,6 +43,10 @@ DRIVE_SPEED = 145
 STOP = 0
 DRIVE_TURN_SPEED = 60
 TURN_SPEED = 140
+
+# Print interval
+print_interval = 500
+last_print_time = 0
 
 # Search algorithm state data [DON'T MODIFY]
 s_state_changed = True
@@ -75,10 +79,13 @@ parser.add_argument("-s", "--serial", help="start serial communication with ESP"
 args = parser.parse_args()
 
 # Auto Serial Port Finding
+
+
 def get_device_com(comports, vid_pid_tuple: List[Tuple[int, int]]):
     device_com = [com.device for com in comports
                   if (com.vid, com.pid) in vid_pid_tuple]
     return device_com[0] if len(device_com) else None
+
 
 ARDU_VID_PID = [(1027, 24577), (9025, 66)]
 comports = list(list_ports.comports())
@@ -182,7 +189,7 @@ def nextState(mode: str, add_cooldown: bool = True, cooldown_amount: float = 1):
 
     if add_cooldown:
         cooldown(cooldown_amount)
-    
+
     lidar_active = True
 
 
@@ -248,7 +255,6 @@ def obstacleAvoidance():
         o_start_time = time.time()
         o_state_changed = False
         first_entrance_for_this_state = True
-        
 
     if o_state == 0:
         if time.time() < o_start_time + (TURN_BASE_TIME*T):
@@ -395,8 +401,11 @@ while True:
     center_y = None if center_y is None else float(center_y)
 
     # Use this while being able to see the screen for debugging purposes
-    print(str(Mode) + "    f: " + str(lidar_distance("f")) + "    r: " + str(lidar_distance("r")) + "                  ", end="\r")
-
+    # current_loop_time = time.time()
+    # if current_loop_time >= last_print_time + print_interval:
+    #     last_print_time = current_loop_time
+    #     print(str(Mode) + "   s_state: " + str(s_state) + "   o_state: " + str(o_state) + "    f: " +
+    #           str(lidar_distance("f")) + "    r: " + str(lidar_distance("r")) + "    fl: " + str(lidar_distance("fl")) + "    fr: " + str(lidar_distance("fr")) + "     ", end="\r")
 
     # if center_x is not None and center_y is None:
     #     print(f"{center_x:0.3f} SICTIIIN             ", end="\r")
