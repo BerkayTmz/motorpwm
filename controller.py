@@ -158,10 +158,19 @@ def init_mode_params(mode: str):
         o_state = 0
 
 
-def lidar_distance(direction: str):
-    min_dist = client.get(f'{direction}:dist')
-    min_dist = None if min_dist is None else float(min_dist)
-    return min_dist
+def lidar_distance(direction: bool):
+
+    if time.time() >= next_lidar_sampling_time:
+        if direction:
+            min_dist = client.mget(['fl:dist', 'f:dist', 'fr:dist'])
+        else:
+            min_dist = client.get('r:dist')
+
+        min_dist = None if min_dist is None else float(min_dist)
+        next_lidar_sampling_time = time.time() + 0.05
+        return min_dist
+    else:
+        return None
 
 
 def cooldown(cd: float = None):
@@ -196,8 +205,8 @@ def nextState(mode: str, add_cooldown: bool = True, cooldown_amount: float = 1):
 def rush(center_x, center_y):
     global rush_stop_distance
 
-    f = lidar_distance("f")
-    if (f and f < rush_stop_distance) or not center_x:
+    f = lidar_distance(True)
+    if (f[1] and f[1] < rush_stop_distance) or not center_x:
         robotDrive("STOP")
         return
     elif center_x:
@@ -234,21 +243,19 @@ def obstacleAvoidance():
 
     first_entrance_for_this_state = False
 
-    if cooldown():
-        robotDrive("STOP")
-        return
-
     if lidar_active:
-        f = lidar_distance("f")
-        fr = lidar_distance("fr")
-        fl = lidar_distance("fl")
-        if (f and f < obstacle_seen_stop_distance) or (fr and fr < side_obstacle_seen_stop_distance) or (fl and fl < side_obstacle_seen_stop_distance):
+        f = lidar_distance(True)
+        if (f[1] and f[1] < obstacle_seen_stop_distance) or (f[0] and f[0] < side_obstacle_seen_stop_distance) or (f[2] and f[2] < side_obstacle_seen_stop_distance):
             robotDrive("STOP")
             Mode = Mode.ObstacleAvoidance
             lidar_active = False
             init_mode_params("o")
             cooldown(1)
             return
+
+    if cooldown():
+        robotDrive("STOP")
+        return
 
     # Execute obstacle avoidance algorithm
     if o_state_changed:
@@ -264,7 +271,7 @@ def obstacleAvoidance():
             return
 
     elif o_state == 1:
-        r = lidar_distance("r")
+        r = lidar_distance(False)
         # and time.time() < o_start_time + searchtengelen:
         if r and r < obstacle_avoided_dist:
             robotDrive("FORWARD")
@@ -292,7 +299,7 @@ def obstacleAvoidance():
             return
 
     elif o_state == 4:
-        r = lidar_distance("r")
+        r = lidar_distance(False)
         # and time.time() < o_start_time + searchtengelen:
         if r and r < obstacle_avoided_dist:
             robotDrive("FORWARD")
@@ -308,7 +315,7 @@ def obstacleAvoidance():
             return
 
     elif o_state == 6:
-        r = lidar_distance("r")
+        r = lidar_distance(False)
         # and time.time() < o_start_time + searchtengelen:
         if time.time() < o_start_time + y:
             robotDrive("FORWARD")
@@ -329,12 +336,11 @@ def obstacleAvoidance():
 def search():
     global s_state_changed, s_state, s_cntr, s_start_time, obstacle_seen_stop_distance, Mode
 
-    f = lidar_distance("f")
-    fr = lidar_distance("fr")
-    fl = lidar_distance("fl")
-    if (f and f < obstacle_seen_stop_distance) or (fr and fr < side_obstacle_seen_stop_distance) or (fl and fl < side_obstacle_seen_stop_distance):
+    f = lidar_distance(True)
+    if (f[1] and f[1] < obstacle_seen_stop_distance) or (f[0] and f[0] < side_obstacle_seen_stop_distance) or (f[2] and f[2] < side_obstacle_seen_stop_distance):
         robotDrive("STOP")
         Mode = Mode.ObstacleAvoidance
+        init_mode_params("o")
         cooldown(1)
         return
 
@@ -376,7 +382,7 @@ def search():
             return
 
 
-def controller(center_x, center_y):
+def controller(center_x=None, center_y=None):
     global Mode
     # Adjust Mode
     if center_x:
@@ -395,10 +401,11 @@ def controller(center_x, center_y):
 
 while True:
 
-    center_x, center_y = client.get("center:x"), client.get("center:y")
+    # UNCOMMENT FOR TARGET/PEER IDENTIFICATION
+    # center_x, center_y = client.get("center:x"), client.get("center:y")
 
-    center_x = None if center_x is None else float(center_x)
-    center_y = None if center_y is None else float(center_y)
+    # center_x = None if center_x is None else float(center_x)
+    # center_y = None if center_y is None else float(center_y)
 
     # Use this while being able to see the screen for debugging purposes
     # current_loop_time = time.time()
