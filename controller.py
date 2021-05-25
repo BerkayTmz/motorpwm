@@ -48,6 +48,9 @@ TURN_SPEED = 140
 print_interval = 500
 last_print_time = 0
 
+# Lidar interval
+next_lidar_sampling_time = 0
+
 # Search algorithm state data [DON'T MODIFY]
 s_state_changed = True
 s_state = 0
@@ -159,18 +162,24 @@ def init_mode_params(mode: str):
 
 
 def lidar_distance(direction: bool):
+    global next_lidar_sampling_time
 
-    if time.time() >= next_lidar_sampling_time:
-        if direction:
+    if direction:
+        ret = [9999, 9999, 9999]
+        if time.time() >= next_lidar_sampling_time:
             min_dist = client.mget(['fl:dist', 'f:dist', 'fr:dist'])
-        else:
-            min_dist = client.get('r:dist')
+            for i, item in enumerate(min_dist):
+                ret[i] = 9999 if item is None else float(item)
+            next_lidar_sampling_time = time.time() + 0.05
+        return ret
 
-        min_dist = None if min_dist is None else float(min_dist)
-        next_lidar_sampling_time = time.time() + 0.05
-        return min_dist
     else:
-        return None
+        min_dist = 9999
+        if time.time() >= next_lidar_sampling_time:
+            min_dist = client.get('r:dist')
+            min_dist = None if min_dist is None else float(min_dist)
+            next_lidar_sampling_time = time.time() + 0.05
+        return min_dist
 
 
 def cooldown(cd: float = None):
@@ -424,4 +433,5 @@ while True:
     # else:
     #     print(f"{None}              ", end="\r")
 
-    controller(center_x, center_y)
+    # controller(center_x, center_y)
+    controller()
