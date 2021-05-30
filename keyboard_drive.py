@@ -5,13 +5,20 @@ import keyboard
 from time import sleep
 import argparse
 from concurrent.futures import ProcessPoolExecutor
+from serial.tools import list_ports
+from typing import List, Tuple
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-d", "--display", help="display camera feed",
-                    action="store_true")
-args = parser.parse_args()
 
-serialPort = serial.Serial(port="/dev/ttyUSB0", baudrate=115200,
+def get_device_com(comports, vid_pid_tuple: List[Tuple[int, int]]):
+    device_com = [com.device for com in comports
+                  if (com.vid, com.pid) in vid_pid_tuple]
+    return device_com[0] if len(device_com) else None
+
+
+ARDU_VID_PID = [(1027, 24577), (9025, 66)]
+comports = list(list_ports.comports())
+ardu_dev_com = get_device_com(comports, ARDU_VID_PID)
+serialPort = serial.Serial(port=ardu_dev_com, baudrate=115200,
                            bytesize=8, timeout=2, stopbits=serial.STOPBITS_ONE)
 
 serialString = ''                           # Used to hold data coming over UART
@@ -109,9 +116,4 @@ def display_camera_feed():
         if cv2.waitKey(1) == 27:
             break
 
-if args.display:
-    with ProcessPoolExecutor(max_workers=2) as executor:
-        executor.submit(display_camera_feed)
-        executor.submit(keyboard_control)
-else:
-    keyboard_control()
+keyboard_control()
