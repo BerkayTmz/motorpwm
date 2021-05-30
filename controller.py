@@ -19,8 +19,8 @@ client = redis.Redis()
 rush_stop_distance = 550
 
 # search algorithm parameters
-TURN_BASE_TIME = 0.50                  # seconds
-FORWARD_BASE_TIME = 1                  # seconds
+TURN_BASE_TIME = 0.33                  # seconds
+FORWARD_BASE_TIME = 0.5                 # seconds
 T = 1                                  # unitless
 obstacle_seen_stop_distance = 700      # millimeters
 obstacle_avoided_dist = 1000           # millimeters
@@ -36,6 +36,7 @@ RIGHT_MOTOR_REVERSE = 15
 LEFT_MOTOR_FORWARD = 20
 LEFT_MOTOR_REVERSE = 25
 
+lastSent = ""
 
 # Pre-defined motor speeds
 # Values must be between 0-255, this value configures to PWM pulse width
@@ -110,42 +111,49 @@ def robotDriveArduino(leftMotorDirection, leftMotorSpeed, rightMotorDirection, r
 
 
 def robotDrive(driveCondition):
-    if(driveCondition == "DRIVE_LEFT"):
+    global lastSent
+    if(driveCondition == "DRIVE_LEFT" and lastSent != "DL"):
         # Turn left, slower left motor with turing speed and right motor with normal driving speed
         robotDriveArduino(LEFT_MOTOR_FORWARD, DRIVE_TURN_SPEED,
                           RIGHT_MOTOR_FORWARD, DRIVE_SPEED)
+        lastSent = "DL"                  
 
-    elif(driveCondition == "DRIVE_RIGHT"):
+    elif(driveCondition == "DRIVE_RIGHT" and lastSent != "DR"):
         # Turn right, slower right motor with turn speed and left motor with normal driving speed
         robotDriveArduino(LEFT_MOTOR_FORWARD, DRIVE_SPEED,
                           RIGHT_MOTOR_FORWARD, DRIVE_TURN_SPEED)
+        lastSent = "DR"
 
-    elif(driveCondition == "TURN_LEFT"):
+    elif(driveCondition == "TURN_LEFT" and lastSent != "TL"):
         # Turn right, slower right motor with turn speed and left motor with normal driving speed
         robotDriveArduino(LEFT_MOTOR_REVERSE, TURN_SPEED,
                           RIGHT_MOTOR_FORWARD, TURN_SPEED)
+        lastSent = "TL"
 
-    elif(driveCondition == "TURN_RIGHT"):
+    elif(driveCondition == "TURN_RIGHT" and lastSent != "TR"):
         # Turn right, slower right motor with turn speed and left motor with normal driving speed
         robotDriveArduino(LEFT_MOTOR_FORWARD, TURN_SPEED,
                           RIGHT_MOTOR_REVERSE, TURN_SPEED)
+        lastSent = "TR"
 
-    elif(driveCondition == "FORWARD"):
+    elif(driveCondition == "FORWARD" and lastSent != "FF"):
         # Drive forward, both motors are driven with DRIVE_SPEED in forward direction
         robotDriveArduino(LEFT_MOTOR_FORWARD, DRIVE_SPEED,
                           RIGHT_MOTOR_FORWARD, DRIVE_SPEED)
+        lastSent = "FF"
 
-    elif(driveCondition == "REVERSE"):
+    elif(driveCondition == "REVERSE" and lastSent != "RR"):
         # Drive reverse, both motors are driven with DRIVE_SPEED in reverse direction
         robotDriveArduino(LEFT_MOTOR_REVERSE, DRIVE_SPEED,
                           RIGHT_MOTOR_REVERSE, DRIVE_SPEED)
+        lastSent = "RR"
 
-    elif(driveCondition == "STOP"):
+    elif(driveCondition == "STOP" and lastSent != "SS"):
         # STOP, stop signal is send to moth motors
         robotDriveArduino(LEFT_MOTOR_FORWARD, STOP, RIGHT_MOTOR_FORWARD, STOP)
-
-    else:
-        robotDriveArduino(LEFT_MOTOR_FORWARD, STOP, RIGHT_MOTOR_FORWARD, STOP)
+        lastSent = "SS"
+    #else:
+    #    robotDriveArduino(LEFT_MOTOR_FORWARD, STOP, RIGHT_MOTOR_FORWARD, STOP)
 
 
 def init_mode_params(mode: str):
@@ -170,7 +178,7 @@ def lidar_distance(direction: bool):
             min_dist = client.mget(['fl:dist', 'f:dist', 'fr:dist'])
             for i, item in enumerate(min_dist):
                 ret[i] = 9999 if item is None else float(item)
-            next_lidar_sampling_time = time.time() + 0.05
+            next_lidar_sampling_time = time.time() + 0.1
         return ret
 
     else:
@@ -178,7 +186,7 @@ def lidar_distance(direction: bool):
         if time.time() >= next_lidar_sampling_time:
             min_dist = client.get('r:dist')
             min_dist = None if min_dist is None else float(min_dist)
-            next_lidar_sampling_time = time.time() + 0.05
+            next_lidar_sampling_time = time.time() + 0.1
         return min_dist
 
 
@@ -208,6 +216,7 @@ def nextState(mode: str, add_cooldown: bool = True, cooldown_amount: float = 1):
     if add_cooldown:
         cooldown(cooldown_amount)
 
+    global lidar_active
     lidar_active = True
 
 
@@ -417,12 +426,11 @@ while True:
     # center_y = None if center_y is None else float(center_y)
 
     # Use this while being able to see the screen for debugging purposes
+    # print("123")
     # current_loop_time = time.time()
     # if current_loop_time >= last_print_time + print_interval:
     #     last_print_time = current_loop_time
-    #     print(str(Mode) + "   s_state: " + str(s_state) + "   o_state: " + str(o_state) + "    f: " +
-    #           str(lidar_distance("f")) + "    r: " + str(lidar_distance("r")) + "    fl: " + str(lidar_distance("fl")) + "    fr: " + str(lidar_distance("fr")) + "     ", end="\r")
-
+    #     print(str(Mode) + "   s_state: " + str(s_state) + "   o_state: " + str(o_state) + "    f: " + str(lidar_distance("f")) + "    r: " + str(lidar_distance("r")) + "    fl: " + str(lidar_distance("fl")) + "    fr: " + str(lidar_distance("fr")) + "     ", end="\r")
     # if center_x is not None and center_y is None:
     #     print(f"{center_x:0.3f} SICTIIIN             ", end="\r")
     # else:
