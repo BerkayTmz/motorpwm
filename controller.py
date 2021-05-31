@@ -9,7 +9,7 @@ from typing import Dict, Tuple, List
 import base64
 import redis
 import time
-from enum import Enum, auto
+from enum import Enum, auto, IntEnum
 
 
 client = redis.Redis()
@@ -22,9 +22,9 @@ rush_stop_distance = 550
 TURN_BASE_TIME = 0.33                  # seconds
 FORWARD_BASE_TIME = 0.5                 # seconds
 T = 1                                  # unitless
-obstacle_seen_stop_distance = 700      # millimeters
+obstacle_seen_stop_distance = 600      # millimeters
 obstacle_avoided_dist = 1000           # millimeters
-side_obstacle_seen_stop_distance = 350  # millimeters
+side_obstacle_seen_stop_distance = 300  # millimeters
 
 # Obctacle avoidance algorithm parameters
 lidar_active = True
@@ -66,11 +66,14 @@ o_start_time = time.time()
 o_down_start = time.time()
 y = 0
 
+f = [9999, 9999, 9999]
+r = 0
 
-class Mode(Enum):
-    Rush = auto()
-    Search = auto()
-    ObstacleAvoidance = auto()
+
+class Mode(IntEnum):
+    Rush = 0
+    Search = 1
+    ObstacleAvoidance = 2
 
 
 Mode = Mode.Search
@@ -116,7 +119,7 @@ def robotDrive(driveCondition):
         # Turn left, slower left motor with turing speed and right motor with normal driving speed
         robotDriveArduino(LEFT_MOTOR_FORWARD, DRIVE_TURN_SPEED,
                           RIGHT_MOTOR_FORWARD, DRIVE_SPEED)
-        lastSent = "DL"                  
+        lastSent = "DL"
 
     elif(driveCondition == "DRIVE_RIGHT" and lastSent != "DR"):
         # Turn right, slower right motor with turn speed and left motor with normal driving speed
@@ -152,42 +155,40 @@ def robotDrive(driveCondition):
         # STOP, stop signal is send to moth motors
         robotDriveArduino(LEFT_MOTOR_FORWARD, STOP, RIGHT_MOTOR_FORWARD, STOP)
         lastSent = "SS"
-    #else:
+    # else:
     #    robotDriveArduino(LEFT_MOTOR_FORWARD, STOP, RIGHT_MOTOR_FORWARD, STOP)
 
 
 def init_mode_params(mode: str):
+    global s_state, s_state_changed, s_cntr, o_state, o_state_changed
     if mode == "s":
-        global s_state, s_state_changed, s_cntr
         s_state_changed = True
         s_state = 0
         s_cntr = 1
 
     elif mode == "o":
-        global o_state, o_state_changed
         o_state_changed = True
         o_state = 0
 
+    client.set('mode:dist', int(Mode))
+    client.set('mode:angle', int(Mode))
+    client.set('o_state:dist', o_state)
+    client.set('o_state:angle', o_state)
+    client.set('s_state:dist', s_state)
+    client.set('s_state:angle', s_state)
 
-def lidar_distance(direction: bool):
-    global next_lidar_sampling_time
 
-    if direction:
-        ret = [9999, 9999, 9999]
-        if time.time() >= next_lidar_sampling_time:
-            min_dist = client.mget(['fl:dist', 'f:dist', 'fr:dist'])
-            for i, item in enumerate(min_dist):
-                ret[i] = 9999 if item is None else float(item)
-            next_lidar_sampling_time = time.time() + 0.1
-        return ret
+def lidar_distance():
+    global next_lidar_sampling_time, f, r
 
-    else:
-        min_dist = 9999
-        if time.time() >= next_lidar_sampling_time:
-            min_dist = client.get('r:dist')
-            min_dist = None if min_dist is None else float(min_dist)
-            next_lidar_sampling_time = time.time() + 0.1
-        return min_dist
+    if time.time() >= next_lidar_sampling_time:
+        min_dist = client.mget(['fl:dist', 'f:dist', 'fr:dist'])
+        for i, item in enumerate(min_dist):
+            f[i] = 9999 if item is None else float(item)
+
+        min_dist = client.get('r:dist')
+        r = 0 if min_dist is None else float(min_dist)
+        next_lidar_sampling_time = time.time() + 0.05
 
 
 def cooldown(cd: float = None):
@@ -199,15 +200,14 @@ def cooldown(cd: float = None):
 
 
 def nextState(mode: str, add_cooldown: bool = True, cooldown_amount: float = 1):
+    global s_state, s_state_changed, s_cntr, o_state, o_state_changed, lidar_active, client
     if mode == "s":
-        global s_state, s_state_changed, s_cntr
         s_state += 1
         if s_state > 3:
             s_state = 0
             s_cntr += 1
         s_state_changed = True
     elif mode == "o":
-        global o_state, o_state_changed
         o_state += 1
         if o_state > 7:
             o_state = 0
@@ -216,14 +216,19 @@ def nextState(mode: str, add_cooldown: bool = True, cooldown_amount: float = 1):
     if add_cooldown:
         cooldown(cooldown_amount)
 
-    global lidar_active
     lidar_active = True
+
+    client.set('mode:dist', int(Mode))
+    client.set('mode:angle', int(Mode))
+    client.set('o_state:dist', o_state)
+    client.set('o_state:angle', o_state)
+    client.set('s_state:dist', s_state)
+    client.set('s_state:angle', s_state)
 
 
 def rush(center_x, center_y):
-    global rush_stop_distance
+    global rush_stop_distance, f, r
 
-    f = lidar_distance(True)
     if (f[1] and f[1] < rush_stop_distance) or not center_x:
         robotDrive("STOP")
         return
@@ -257,12 +262,11 @@ def rush(center_x, center_y):
 
 
 def obstacleAvoidance():
-    global o_state_changed, o_state, o_start_time, o_down_start, Mode, y, obstacle_seen_stop_distance, lidar_active
+    global o_state_changed, o_state, o_start_time, o_down_start, Mode, y, obstacle_seen_stop_distance, lidar_active, f, r
 
     first_entrance_for_this_state = False
 
     if lidar_active:
-        f = lidar_distance(True)
         if (f[1] and f[1] < obstacle_seen_stop_distance) or (f[0] and f[0] < side_obstacle_seen_stop_distance) or (f[2] and f[2] < side_obstacle_seen_stop_distance):
             robotDrive("STOP")
             Mode = Mode.ObstacleAvoidance
@@ -289,7 +293,6 @@ def obstacleAvoidance():
             return
 
     elif o_state == 1:
-        r = lidar_distance(False)
         # and time.time() < o_start_time + searchtengelen:
         if r and r < obstacle_avoided_dist:
             robotDrive("FORWARD")
@@ -317,7 +320,6 @@ def obstacleAvoidance():
             return
 
     elif o_state == 4:
-        r = lidar_distance(False)
         # and time.time() < o_start_time + searchtengelen:
         if r and r < obstacle_avoided_dist:
             robotDrive("FORWARD")
@@ -333,7 +335,6 @@ def obstacleAvoidance():
             return
 
     elif o_state == 6:
-        r = lidar_distance(False)
         # and time.time() < o_start_time + searchtengelen:
         if time.time() < o_start_time + y:
             robotDrive("FORWARD")
@@ -352,9 +353,8 @@ def obstacleAvoidance():
 
 
 def search():
-    global s_state_changed, s_state, s_cntr, s_start_time, obstacle_seen_stop_distance, Mode
+    global s_state_changed, s_state, s_cntr, s_start_time, obstacle_seen_stop_distance, Mode, f, r
 
-    f = lidar_distance(True)
     if (f[1] and f[1] < obstacle_seen_stop_distance) or (f[0] and f[0] < side_obstacle_seen_stop_distance) or (f[2] and f[2] < side_obstacle_seen_stop_distance):
         robotDrive("STOP")
         Mode = Mode.ObstacleAvoidance
@@ -442,4 +442,6 @@ while True:
     #     print(f"{None}              ", end="\r")
 
     # controller(center_x, center_y)
+
+    lidar_distance()
     controller()
