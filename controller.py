@@ -9,7 +9,9 @@ from enum import IntEnum
 client = redis.Redis()
 
 # Rush algorithm parameters
-rush_stop_distance = 550
+rush_stop_distance = 1000
+center_x = 0
+next_redis_read = 0
 
 # search algorithm parameters
 TURN_BASE_TIME = 0.33                  # seconds
@@ -402,7 +404,10 @@ def controller(center_x):
 
 
 while True:
-    center_x = client.get('center:x')
-    center_x = None if center_x is None else float(center_x)
+    if time.time() >= next_redis_read:
+        center_x = client.get('center:x')
+        next_redis_read = time.time() + 0.05
+        center_x = None if center_x is None else float(center_x)
+
     lidar_distance()
     controller(center_x)
