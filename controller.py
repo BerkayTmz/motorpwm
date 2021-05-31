@@ -35,7 +35,7 @@ lastSent = ""
 
 # Pre-defined motor speeds
 # Values must be between 0-255, this value configures to PWM pulse width
-DRIVE_SPEED = 145
+DRIVE_SPEED = 120
 STOP = 0
 DRIVE_TURN_SPEED = 60
 TURN_SPEED = 140
@@ -44,8 +44,6 @@ TURN_SPEED = 140
 print_interval = 500
 last_print_time = 0
 
-# Lidar interval
-next_lidar_sampling_time = 0
 
 # Search algorithm state data [DON'T MODIFY]
 s_state_changed = True
@@ -168,17 +166,25 @@ def init_mode_params(mode: str):
     client.set('s_state:angle', s_state)
 
 
-def lidar_distance():
-    global next_lidar_sampling_time, f, r
+def redis_read():
+    global f, r, center_x, next_redis_read
 
-    if time.time() >= next_lidar_sampling_time:
-        min_dist = client.mget(['fl:dist', 'f:dist', 'fr:dist'])
-        for i, item in enumerate(min_dist):
+    if time.time() >= next_redis_read:
+
+        # Update Camera
+        center_x = client.get('center:x')
+        center_x = None if center_x is None else float(center_x)
+
+        # Update Lidar
+        min_dist_f = client.mget(['fl:dist', 'f:dist', 'fr:dist'])
+        for i, item in enumerate(min_dist_f):
             f[i] = 9999 if item is None else float(item)
 
-        min_dist = client.get('r:dist')
-        r = 0 if min_dist is None else float(min_dist)
-        next_lidar_sampling_time = time.time() + 0.05
+        min_dist_r = client.get('r:dist')
+        r = 0 if min_dist_r is None else float(min_dist_r)
+
+        # Put timeout
+        next_redis_read = time.time() + 0.05
 
 
 def cooldown(cd: float = None):
@@ -404,10 +410,5 @@ def controller(center_x):
 
 
 while True:
-    if time.time() >= next_redis_read:
-        center_x = client.get('center:x')
-        next_redis_read = time.time() + 0.05
-        center_x = None if center_x is None else float(center_x)
-
-    lidar_distance()
+    redis_read()
     controller(center_x)
