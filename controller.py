@@ -61,6 +61,8 @@ y = 0
 
 f = [9999, 9999, 9999]
 r = 0
+RUSH_WAIT = False
+RUSH_START = 0
 
 
 class Mode(IntEnum):
@@ -374,10 +376,19 @@ def search():
 
 
 def controller(center_x):
-    global MODE
+    global MODE, RUSH_WAIT, RUSH_START
     # Adjust Mode
     if center_x:
         MODE = Mode.Rush
+    elif MODE == Mode.Rush:
+        if RUSH_WAIT:
+            if time.time() - RUSH_START > 3:
+                MODE = Mode.Search
+                init_mode_params('s')
+                RUSH_WAIT = False
+        else:
+            RUSH_WAIT = True
+            RUSH_START = time.time()
 
     # Execute Mode
     if MODE == Mode.Rush:
