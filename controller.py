@@ -1,19 +1,12 @@
 import serial
-from detector import Detector, TargetType
-import argparse
-import cv2
-import numpy as np
-from serial import Serial
 from serial.tools import list_ports
 from typing import Dict, Tuple, List
-import base64
 import redis
 import time
-from enum import Enum, auto, IntEnum
+from enum import IntEnum
 
 
 client = redis.Redis()
-# pubsub = client.pubsub()
 
 # Rush algorithm parameters
 rush_stop_distance = 550
@@ -76,14 +69,7 @@ class Mode(IntEnum):
     ObstacleAvoidance = 2
 
 
-Mode = Mode.Search
-
-parser = argparse.ArgumentParser()
-parser.add_argument("-d", "--display", help="display camera feed",
-                    action="store_true")
-parser.add_argument("-s", "--serial", help="start serial communication with ESP",
-                    action="store_true")
-args = parser.parse_args()
+MODE = Mode.Search
 
 # Auto Serial Port Finding
 
@@ -170,8 +156,8 @@ def init_mode_params(mode: str):
         o_state_changed = True
         o_state = 0
 
-    client.set('mode:dist', int(Mode))
-    client.set('mode:angle', int(Mode))
+    client.set('mode:dist', int(MODE))
+    client.set('mode:angle', int(MODE))
     client.set('o_state:dist', o_state)
     client.set('o_state:angle', o_state)
     client.set('s_state:dist', s_state)
@@ -218,15 +204,15 @@ def nextState(mode: str, add_cooldown: bool = True, cooldown_amount: float = 1):
 
     lidar_active = True
 
-    client.set('mode:dist', int(Mode))
-    client.set('mode:angle', int(Mode))
+    client.set('mode:dist', int(MODE))
+    client.set('mode:angle', int(MODE))
     client.set('o_state:dist', o_state)
     client.set('o_state:angle', o_state)
     client.set('s_state:dist', s_state)
     client.set('s_state:angle', s_state)
 
 
-def rush(center_x, center_y):
+def rush(center_x):
     global rush_stop_distance, f, r
 
     if (f[1] and f[1] < rush_stop_distance) or not center_x:
@@ -235,20 +221,7 @@ def rush(center_x, center_y):
     elif center_x:
         center_x = int((center_x + 1)*100)
 
-        if center_y:
-            center_y = int((center_y + 1)*100)
-            if center_y < 40:
-                robotDrive("STOP")
-                return
-
-        # s_state_changed = 2
-        # s_state = 0
-        # s_cntr = 1
-        # s_start_time = time.time()
-
         if(center_x < 80):  # turn left
-            # Turn left, slower left motor with turing speed and right motor with normal driving speed
-            #robotDriveArduino(LEFT_MOTOR_FORWARD, TURN_SPEED, RIGHT_MOTOR_FORWARD, DRIVE_SPEED)
             robotDrive("DRIVE_LEFT")
 
         elif(center_x > 120):  # turn right
@@ -262,14 +235,14 @@ def rush(center_x, center_y):
 
 
 def obstacleAvoidance():
-    global o_state_changed, o_state, o_start_time, o_down_start, Mode, y, obstacle_seen_stop_distance, lidar_active, f, r
+    global o_state_changed, o_state, o_start_time, o_down_start, MODE, y, obstacle_seen_stop_distance, lidar_active, f, r
 
     first_entrance_for_this_state = False
 
     if lidar_active:
         if (f[1] and f[1] < obstacle_seen_stop_distance) or (f[0] and f[0] < side_obstacle_seen_stop_distance) or (f[2] and f[2] < side_obstacle_seen_stop_distance):
             robotDrive("STOP")
-            Mode = Mode.ObstacleAvoidance
+            MODE = Mode.ObstacleAvoidance
             lidar_active = False
             init_mode_params("o")
             cooldown(1)
@@ -310,8 +283,8 @@ def obstacleAvoidance():
             nextState("o")
             return
 
-# Araya state ekle default bir süre gitsin (1 metre götürcek kadar mesela)
-# x initialize et, yatay gittiğin yolu ölç [gerekirse]
+    # Araya state ekle default bir süre gitsin (1 metre götürcek kadar mesela)
+    # x initialize et, yatay gittiğin yolu ölç [gerekirse]
     elif o_state == 3:
         if time.time() < o_start_time + FORWARD_BASE_TIME*T:
             robotDrive("FORWARD")
@@ -347,17 +320,17 @@ def obstacleAvoidance():
             robotDrive("TURN_LEFT")
         else:
             nextState("o")
-            Mode = Mode.Search
+            MODE = Mode.Search
             init_mode_params("o")
             return
 
 
 def search():
-    global s_state_changed, s_state, s_cntr, s_start_time, obstacle_seen_stop_distance, Mode, f, r
+    global s_state_changed, s_state, s_cntr, s_start_time, obstacle_seen_stop_distance, MODE, f, r
 
     if (f[1] and f[1] < obstacle_seen_stop_distance) or (f[0] and f[0] < side_obstacle_seen_stop_distance) or (f[2] and f[2] < side_obstacle_seen_stop_distance):
         robotDrive("STOP")
-        Mode = Mode.ObstacleAvoidance
+        MODE = Mode.ObstacleAvoidance
         init_mode_params("o")
         cooldown(1)
         return
@@ -400,48 +373,25 @@ def search():
             return
 
 
-def controller(center_x=None, center_y=None):
-    global Mode
+def controller(center_x):
+    global MODE
     # Adjust Mode
     if center_x:
-        Mode = Mode.Rush
+        MODE = Mode.Rush
 
     # Execute Mode
-    if Mode == Mode.Rush:
-        rush(center_x, center_y)
-    elif Mode == Mode.Search:
+    if MODE == Mode.Rush:
+        rush(center_x)
+    elif MODE == Mode.Search:
         search()
-    elif Mode == Mode.ObstacleAvoidance:
+    elif MODE == Mode.ObstacleAvoidance:
         obstacleAvoidance()
     else:
         robotDrive("STOP")
 
 
 while True:
-
-    # UNCOMMENT FOR TARGET/PEER IDENTIFICATION
-    # center_x, center_y = client.get("center:x"), client.get("center:y")
-
-    # center_x = None if center_x is None else float(center_x)
-    # center_y = None if center_y is None else float(center_y)
-
-    # Use this while being able to see the screen for debugging purposes
-    # print("123")
-    # current_loop_time = time.time()
-    # if current_loop_time >= last_print_time + print_interval:
-    #     last_print_time = current_loop_time
-    #     print(str(Mode) + "   s_state: " + str(s_state) + "   o_state: " + str(o_state) + "    f: " + str(lidar_distance("f")) + "    r: " + str(lidar_distance("r")) + "    fl: " + str(lidar_distance("fl")) + "    fr: " + str(lidar_distance("fr")) + "     ", end="\r")
-    # if center_x is not None and center_y is None:
-    #     print(f"{center_x:0.3f} SICTIIIN             ", end="\r")
-    # else:
-    #     print(f"{None}              ", end="\r")
-
-    # if center_y is not None:
-    #     print(f"{center_y:0.3f}              ", end="\r")
-    # else:
-    #     print(f"{None}              ", end="\r")
-
-    # controller(center_x, center_y)
-
+    center_x = client.get('center:x')
+    center_x = None if center_x is None else float(center_x)
     lidar_distance()
-    controller()
+    controller(center_x)
