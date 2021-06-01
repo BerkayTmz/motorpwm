@@ -12,6 +12,8 @@ client = redis.Redis()
 rush_stop_distance = 1000
 center_x = 0
 next_redis_read = 0
+next_arduino_clear = 0
+escape_params_initialized_time = 0
 
 # escape algorithm parameters
 TURN_BASE_TIME = 0.33                   # seconds
@@ -151,11 +153,14 @@ def robotDrive(driveCondition):
 
 
 def init_mode_params(mode: str):
-    global e_state, e_state_changed, e_cntr, o_state, o_state_changed
-    if mode == "e":
+    global e_state, e_state_changed, e_cntr, o_state, o_state_changed, TURN_BASE_TIME, T, escape_params_initialized_time
+
+    if (mode == "e") and ( time.time() > escape_params_initialized_time + 4*(TURN_BASE_TIME*T) ):
+        escape_params_initialized_time = time.time()
         e_state_changed = True
         e_state = 0
         e_cntr = 1
+        escape_started = time.time()
 
     elif mode == "o":
         o_state_changed = True
@@ -169,26 +174,40 @@ def init_mode_params(mode: str):
     # client.set('e_state:angle', e_state)
 
 
-def redis_read():
-    global f, r, center_x, next_redis_read, lastSent
+def maintenance_task():
+    global next_redis_read, next_arduino_clear
 
-    if time.time() >= next_redis_read:
+    def redis_read():
+        global f, r, center_x
+            # Update Camera
+            center_x = client.get('center:x')
+            center_x = None if center_x is None else float(center_x)
 
-        # Update Camera
-        center_x = client.get('center:x')
-        center_x = None if center_x is None else float(center_x)
+            # Update Lidar
+            min_dist_f = client.mget(['fl:dist', 'f:dist', 'fr:dist'])
+            for i, item in enumerate(min_dist_f):
+                f[i] = 9999 if item is None else float(item)
 
-        # Update Lidar
-        min_dist_f = client.mget(['fl:dist', 'f:dist', 'fr:dist'])
-        for i, item in enumerate(min_dist_f):
-            f[i] = 9999 if item is None else float(item)
+            min_dist_r = client.get('r:dist')
+            r = 0 if min_dist_r is None else float(min_dist_r)
 
-        min_dist_r = client.get('r:dist')
-        r = 0 if min_dist_r is None else float(min_dist_r)
+            # Put timeout
+            next_redis_read = time.time() + 0.05
+    
+    # Clear lastSent data to Arduino
+    def clear_lastsent():
+        global next_arduino_clear, lastSent
+        lastSent = ""
 
         # Put timeout
-        next_redis_read = time.time() + 0.05
-        lastSent = ''
+        next_arduino_clear = time.time() + 1
+    
+    if time.time() >= next_redis_read:
+        redis_read()
+    
+    if time.time() >= next_arduino_clear:
+        clear_lastsent()
+        
 
 
 def cooldown(cd: float = None):
@@ -227,11 +246,7 @@ def nextState(mode: str, add_cooldown: bool = True, cooldown_amount: float = 1):
 def rush(center_x):
     global rush_stop_distance, f, MODE
 
-    if center_x:
-        MODE = Mode.Escape
-        return
-
-    elif (f[1] and f[1] < rush_stop_distance):
+    if (f[1] and f[1] < rush_stop_distance):
         robotDrive("STOP")
         return
 
@@ -251,6 +266,7 @@ def obstacleAvoidance():
             MODE = Mode.ObstacleAvoidance
             lidar_active = False
             init_mode_params("o")
+
             cooldown(1)
             return
 
@@ -334,8 +350,6 @@ def obstacleAvoidance():
 def escape():
     global e_state_changed, e_state, e_cntr, e_start_time, obstacle_seen_stop_distance, MODE, f, r, escape_started
 
-    if escape_started == 0:
-        escape_started = time.time()
 
     if (f[1] and f[1] < obstacle_seen_stop_distance) or (f[0] and f[0] < side_obstacle_seen_stop_distance) or (f[2] and f[2] < side_obstacle_seen_stop_distance):
         robotDrive("STOP")
@@ -368,6 +382,7 @@ def controller(center_x):
 
     # Adjust Mode
     if center_x:
+        init_mode_params("e")
         MODE = Mode.Escape
 
     # Execute Mode
@@ -385,5 +400,5 @@ while True:
     if (escape_started != 0) and (time.time() >= escape_started + mission_complete_time):
         robotDrive("STOP")
     else:
-        redis_read()
+        maintenance_task()
         controller(center_x)
