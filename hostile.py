@@ -333,7 +333,7 @@ def obstacleAvoidance():
 def escape():
     global e_state_changed, e_state, e_cntr, e_start_time, obstacle_seen_stop_distance, MODE, f, r, escape_started, lidar_active
 
-    if (f[1] and f[1] < obstacle_seen_stop_distance) or (f[0] and f[0] < side_obstacle_seen_stop_distance) or (f[2] and f[2] < side_obstacle_seen_stop_distance):
+    if lidar_active and ( (f[1] and f[1] < obstacle_seen_stop_distance) or (f[0] and f[0] < side_obstacle_seen_stop_distance) or (f[2] and f[2] < side_obstacle_seen_stop_distance) ):
         robotDrive("STOP")
         MODE = Mode.ObstacleAvoidance
         init_mode_params("o")
