@@ -72,7 +72,8 @@ class Mode(IntEnum):
     Rush = 0
     Escape = 1
     ObstacleAvoidance = 2
-    
+
+
 MODE = Mode.Rush
 
 # Auto Serial Port Finding
@@ -169,7 +170,7 @@ def init_mode_params(mode: str):
 
 
 def redis_read():
-    global f, r, center_x, next_redis_read
+    global f, r, center_x, next_redis_read, lastSent
 
     if time.time() >= next_redis_read:
 
@@ -187,6 +188,7 @@ def redis_read():
 
         # Put timeout
         next_redis_read = time.time() + 0.05
+        lastSent = ''
 
 
 def cooldown(cd: float = None):
@@ -233,14 +235,13 @@ def rush(center_x):
         robotDrive("STOP")
         return
 
-    elif not center_x:
+    else:
         robotDrive("FORWARD")
         return
 
 
 def obstacleAvoidance():
     global o_state_changed, o_state, o_start_time, o_down_start, MODE, y, obstacle_seen_stop_distance, lidar_active, f, r
-
 
     first_entrance_for_this_state = False
 
@@ -343,14 +344,13 @@ def escape():
         cooldown(1)
         return
 
-
     # Execute escape algorithm
     if e_state_changed:
         e_start_time = time.time()
         e_state_changed = False
 
     # Turn 180 degree
-    elif e_state == 0: 
+    elif e_state == 0:
         if time.time() < e_start_time + 2*(TURN_BASE_TIME*T):
             robotDrive("TURN_LEFT")
         else:
@@ -361,7 +361,7 @@ def escape():
     elif e_state == 1:
         robotDrive("FORWARD")
         return
-       
+
 
 def controller(center_x):
     global MODE
