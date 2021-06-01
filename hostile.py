@@ -155,7 +155,7 @@ def robotDrive(driveCondition):
 def init_mode_params(mode: str):
     global e_state, e_state_changed, e_cntr, o_state, o_state_changed, TURN_BASE_TIME, T, escape_params_initialized_time
 
-    if (mode == "e") and ( time.time() > escape_params_initialized_time + 4*(TURN_BASE_TIME*T) ):
+    if (mode == "e") and (time.time() > escape_params_initialized_time + 4*(TURN_BASE_TIME*T)):
         escape_params_initialized_time = time.time()
         e_state_changed = True
         e_state = 0
@@ -175,25 +175,23 @@ def init_mode_params(mode: str):
 
 
 def maintenance_task():
-    global next_redis_read, next_arduino_clear
-
     def redis_read():
-        global f, r, center_x
-            # Update Camera
-            center_x = client.get('center:x')
-            center_x = None if center_x is None else float(center_x)
+        global f, r, center_x, next_redis_read
+        # Update Camera
+        center_x = client.get('center:x')
+        center_x = None if center_x is None else float(center_x)
 
-            # Update Lidar
-            min_dist_f = client.mget(['fl:dist', 'f:dist', 'fr:dist'])
-            for i, item in enumerate(min_dist_f):
-                f[i] = 9999 if item is None else float(item)
+        # Update Lidar
+        min_dist_f = client.mget(['fl:dist', 'f:dist', 'fr:dist'])
+        for i, item in enumerate(min_dist_f):
+            f[i] = 9999 if item is None else float(item)
 
-            min_dist_r = client.get('r:dist')
-            r = 0 if min_dist_r is None else float(min_dist_r)
+        min_dist_r = client.get('r:dist')
+        r = 0 if min_dist_r is None else float(min_dist_r)
 
-            # Put timeout
-            next_redis_read = time.time() + 0.05
-    
+        # Put timeout
+        next_redis_read = time.time() + 0.05
+
     # Clear lastSent data to Arduino
     def clear_lastsent():
         global next_arduino_clear, lastSent
@@ -201,13 +199,12 @@ def maintenance_task():
 
         # Put timeout
         next_arduino_clear = time.time() + 1
-    
+
     if time.time() >= next_redis_read:
         redis_read()
-    
+
     if time.time() >= next_arduino_clear:
         clear_lastsent()
-        
 
 
 def cooldown(cd: float = None):
@@ -349,7 +346,6 @@ def obstacleAvoidance():
 
 def escape():
     global e_state_changed, e_state, e_cntr, e_start_time, obstacle_seen_stop_distance, MODE, f, r, escape_started
-
 
     if (f[1] and f[1] < obstacle_seen_stop_distance) or (f[0] and f[0] < side_obstacle_seen_stop_distance) or (f[2] and f[2] < side_obstacle_seen_stop_distance):
         robotDrive("STOP")
