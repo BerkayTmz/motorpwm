@@ -153,7 +153,7 @@ def robotDrive(driveCondition):
 
 
 def init_mode_params(mode: str):
-    global e_state, e_state_changed, e_cntr, o_state, o_state_changed, TURN_BASE_TIME, T, escape_params_initialized_time
+    global e_state, e_state_changed, e_cntr, o_state, o_state_changed, TURN_BASE_TIME, T, escape_params_initialized_time, escape_started
 
     if (mode == "e") and (time.time() > escape_params_initialized_time + 4*(TURN_BASE_TIME*T)):
         escape_params_initialized_time = time.time()
@@ -165,13 +165,6 @@ def init_mode_params(mode: str):
     elif mode == "o":
         o_state_changed = True
         o_state = 0
-
-    # client.set('mode:dist', int(MODE))
-    # client.set('mode:angle', int(MODE))
-    # client.set('o_state:dist', o_state)
-    # client.set('o_state:angle', o_state)
-    # client.set('e_state:dist', e_state)
-    # client.set('e_state:angle', e_state)
 
 
 def maintenance_task():
@@ -231,13 +224,6 @@ def nextState(mode: str, add_cooldown: bool = True, cooldown_amount: float = 1):
         cooldown(cooldown_amount)
 
     lidar_active = True
-
-    # client.set('mode:dist', int(MODE))
-    # client.set('mode:angle', int(MODE))
-    # client.set('o_state:dist', o_state)
-    # client.set('o_state:angle', o_state)
-    # client.set('e_state:dist', e_state)
-    # client.set('e_state:angle', e_state)
 
 
 def rush(center_x):
