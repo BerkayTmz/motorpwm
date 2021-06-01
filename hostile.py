@@ -373,6 +373,8 @@ def controller(center_x):
     # Execute Mode
     if MODE == Mode.Rush:
         rush(center_x)
+    elif MODE == Mode.Escape:
+        escape()
     elif MODE == Mode.ObstacleAvoidance:
         obstacleAvoidance()
     else:
