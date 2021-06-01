@@ -382,7 +382,7 @@ def controller(center_x):
 
 
 while True:
-    if (escape_started != 0) and (escape_started >= time.time() + mission_complete_time):
+    if (escape_started != 0) and (time.time() >= escape_started + mission_complete_time):
         robotDrive("STOP")
     else:
         redis_read()
