@@ -331,7 +331,7 @@ def obstacleAvoidance():
 
 
 def escape():
-    global e_state_changed, e_state, e_cntr, e_start_time, obstacle_seen_stop_distance, MODE, f, r, escape_started
+    global e_state_changed, e_state, e_cntr, e_start_time, obstacle_seen_stop_distance, MODE, f, r, escape_started, lidar_active
 
     if (f[1] and f[1] < obstacle_seen_stop_distance) or (f[0] and f[0] < side_obstacle_seen_stop_distance) or (f[2] and f[2] < side_obstacle_seen_stop_distance):
         robotDrive("STOP")
@@ -348,6 +348,7 @@ def escape():
     # Turn 180 degree
     elif e_state == 0:
         if time.time() < e_start_time + 2*(TURN_BASE_TIME*T):
+            lidar_active = False
             robotDrive("TURN_LEFT")
         else:
             nextState("e", False)
