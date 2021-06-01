@@ -234,7 +234,7 @@ def rush(center_x):
         return
 
     else:
-        robotDrive("FORWARD")
+        robotDrive("STOP")
         return
 
 
@@ -379,8 +379,10 @@ def controller(center_x):
 
 
 while True:
+    maintenance_task()
     if (escape_started != 0) and (time.time() >= escape_started + mission_complete_time):
+        if center_x:
+            escape_started = 0
         robotDrive("STOP")
     else:
-        maintenance_task()
         controller(center_x)
