@@ -229,7 +229,7 @@ def rush(center_x):
         MODE = Mode.Escape
         return
 
-    elif (f[1] and f[1] < rush_stop_distance)
+    elif (f[1] and f[1] < rush_stop_distance):
         robotDrive("STOP")
         return
 
