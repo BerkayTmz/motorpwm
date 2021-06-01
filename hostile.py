@@ -2,19 +2,80 @@ import serial
 from serial.tools import list_ports
 from typing import Dict, Tuple, List
 import redis
+import time
+from enum import IntEnum
+
 
 client = redis.Redis()
 
+# Rush algorithm parameters
+rush_stop_distance = 1000
+center_x = 0
+next_redis_read = 0
+
+# escape algorithm parameters
+TURN_BASE_TIME = 0.33                   # seconds
+FORWARD_BASE_TIME = 0.5                 # seconds
+T = 1                                   # unitless
+obstacle_seen_stop_distance = 600       # millimeters
+obstacle_avoided_dist = 1000            # millimeters
+side_obstacle_seen_stop_distance = 300  # millimeters
+
+escape_started = 0
+mission_complete_time = 15              # seconds
+
+# Obctacle avoidance algorithm parameters
+lidar_active = True
+
+
+# Codes to communicate with Arduino to drive individual motors to each direction
 RIGHT_MOTOR_FORWARD = 10
 RIGHT_MOTOR_REVERSE = 15
 LEFT_MOTOR_FORWARD = 20
 LEFT_MOTOR_REVERSE = 25
 
-DRIVE_SPEED = 145
+lastSent = ""
+
+# Pre-defined motor speeds
+# Values must be between 0-255, this value configures to PWM pulse width
+DRIVE_SPEED = 120
 STOP = 0
 DRIVE_TURN_SPEED = 60
 TURN_SPEED = 140
-STOP_DIST = 500
+
+# Print interval
+print_interval = 500
+last_print_time = 0
+
+
+# Search algorithm state data [DON'T MODIFY]
+e_state_changed = True
+e_state = 0
+e_cntr = 1
+e_start_time = time.time()
+cooldown_until = time.time()
+
+# Obstacle avoidance algorithm state data [DON'T MODIFY]
+o_state_changed = True
+o_state = 0
+o_start_time = time.time()
+o_down_start = time.time()
+y = 0
+
+f = [9999, 9999, 9999]
+r = 0
+RUSH_WAIT = False
+RUSH_START = 0
+
+
+class Mode(IntEnum):
+    Rush = 0
+    Escape = 1
+    ObstacleAvoidance = 2
+    
+MODE = Mode.Rush
+
+# Auto Serial Port Finding
 
 
 def get_device_com(comports, vid_pid_tuple: List[Tuple[int, int]]):
@@ -43,66 +104,284 @@ def robotDriveArduino(leftMotorDirection, leftMotorSpeed, rightMotorDirection, r
 
 
 def robotDrive(driveCondition):
-    if(driveCondition == "DRIVE_LEFT"):
+    global lastSent
+    if(driveCondition == "DRIVE_LEFT" and lastSent != "DL"):
         # Turn left, slower left motor with turing speed and right motor with normal driving speed
         robotDriveArduino(LEFT_MOTOR_FORWARD, DRIVE_TURN_SPEED,
                           RIGHT_MOTOR_FORWARD, DRIVE_SPEED)
+        lastSent = "DL"
 
-    elif(driveCondition == "DRIVE_RIGHT"):
+    elif(driveCondition == "DRIVE_RIGHT" and lastSent != "DR"):
         # Turn right, slower right motor with turn speed and left motor with normal driving speed
         robotDriveArduino(LEFT_MOTOR_FORWARD, DRIVE_SPEED,
                           RIGHT_MOTOR_FORWARD, DRIVE_TURN_SPEED)
+        lastSent = "DR"
 
-    elif(driveCondition == "TURN_LEFT"):
+    elif(driveCondition == "TURN_LEFT" and lastSent != "TL"):
         # Turn right, slower right motor with turn speed and left motor with normal driving speed
         robotDriveArduino(LEFT_MOTOR_REVERSE, TURN_SPEED,
                           RIGHT_MOTOR_FORWARD, TURN_SPEED)
+        lastSent = "TL"
 
-    elif(driveCondition == "TURN_RIGHT"):
+    elif(driveCondition == "TURN_RIGHT" and lastSent != "TR"):
         # Turn right, slower right motor with turn speed and left motor with normal driving speed
         robotDriveArduino(LEFT_MOTOR_FORWARD, TURN_SPEED,
                           RIGHT_MOTOR_REVERSE, TURN_SPEED)
+        lastSent = "TR"
 
-    elif(driveCondition == "FORWARD"):
+    elif(driveCondition == "FORWARD" and lastSent != "FF"):
         # Drive forward, both motors are driven with DRIVE_SPEED in forward direction
         robotDriveArduino(LEFT_MOTOR_FORWARD, DRIVE_SPEED,
                           RIGHT_MOTOR_FORWARD, DRIVE_SPEED)
+        lastSent = "FF"
 
-    elif(driveCondition == "REVERSE"):
+    elif(driveCondition == "REVERSE" and lastSent != "RR"):
         # Drive reverse, both motors are driven with DRIVE_SPEED in reverse direction
         robotDriveArduino(LEFT_MOTOR_REVERSE, DRIVE_SPEED,
                           RIGHT_MOTOR_REVERSE, DRIVE_SPEED)
+        lastSent = "RR"
 
-    elif(driveCondition == "STOP"):
+    elif(driveCondition == "STOP" and lastSent != "SS"):
         # STOP, stop signal is send to moth motors
         robotDriveArduino(LEFT_MOTOR_FORWARD, STOP, RIGHT_MOTOR_FORWARD, STOP)
+        lastSent = "SS"
+    # else:
+    #    robotDriveArduino(LEFT_MOTOR_FORWARD, STOP, RIGHT_MOTOR_FORWARD, STOP)
 
+
+def init_mode_params(mode: str):
+    global e_state, e_state_changed, e_cntr, o_state, o_state_changed
+    if mode == "e":
+        e_state_changed = True
+        e_state = 0
+        e_cntr = 1
+
+    elif mode == "o":
+        o_state_changed = True
+        o_state = 0
+
+    # client.set('mode:dist', int(MODE))
+    # client.set('mode:angle', int(MODE))
+    # client.set('o_state:dist', o_state)
+    # client.set('o_state:angle', o_state)
+    # client.set('e_state:dist', e_state)
+    # client.set('e_state:angle', e_state)
+
+
+def redis_read():
+    global f, r, center_x, next_redis_read
+
+    if time.time() >= next_redis_read:
+
+        # Update Camera
+        center_x = client.get('center:x')
+        center_x = None if center_x is None else float(center_x)
+
+        # Update Lidar
+        min_dist_f = client.mget(['fl:dist', 'f:dist', 'fr:dist'])
+        for i, item in enumerate(min_dist_f):
+            f[i] = 9999 if item is None else float(item)
+
+        min_dist_r = client.get('r:dist')
+        r = 0 if min_dist_r is None else float(min_dist_r)
+
+        # Put timeout
+        next_redis_read = time.time() + 0.05
+
+
+def cooldown(cd: float = None):
+    global cooldown_until
+    if cd is None:
+        return (cooldown_until > time.time())
     else:
-        robotDriveArduino(LEFT_MOTOR_FORWARD, STOP, RIGHT_MOTOR_FORWARD, STOP)
+        cooldown_until = time.time() + cd
+
+
+def nextState(mode: str, add_cooldown: bool = True, cooldown_amount: float = 1):
+    global e_state, e_state_changed, e_cntr, o_state, o_state_changed, lidar_active, client
+    if mode == "e":
+        e_state += 1
+        e_state_changed = True
+
+    elif mode == "o":
+        o_state += 1
+        if o_state > 7:
+            o_state = 0
+        o_state_changed = True
+
+    if add_cooldown:
+        cooldown(cooldown_amount)
+
+    lidar_active = True
+
+    # client.set('mode:dist', int(MODE))
+    # client.set('mode:angle', int(MODE))
+    # client.set('o_state:dist', o_state)
+    # client.set('o_state:angle', o_state)
+    # client.set('e_state:dist', e_state)
+    # client.set('e_state:angle', e_state)
 
 
 def rush(center_x):
-    center_x = int((center_x + 1) * 100)
+    global rush_stop_distance, f, MODE
 
-    if(center_x < 80):  # turn left
-        robotDrive("DRIVE_LEFT")
+    if center_x:
+        MODE = Mode.Escape
+        return
 
-    elif(center_x > 120):  # turn right
-        robotDrive("DRIVE_RIGHT")
-    else:
+    elif (f[1] and f[1] < rush_stop_distance)
+        robotDrive("STOP")
+        return
+
+    elif not center_x:
         robotDrive("FORWARD")
+        return
 
 
-def controller(center_x, min_fdist):
-    if center_x and (min_fdist is None or min_fdist > STOP_DIST):
+def obstacleAvoidance():
+    global o_state_changed, o_state, o_start_time, o_down_start, MODE, y, obstacle_seen_stop_distance, lidar_active, f, r
+
+
+    first_entrance_for_this_state = False
+
+    if lidar_active:
+        if (f[1] and f[1] < obstacle_seen_stop_distance) or (f[0] and f[0] < side_obstacle_seen_stop_distance) or (f[2] and f[2] < side_obstacle_seen_stop_distance):
+            robotDrive("STOP")
+            MODE = Mode.ObstacleAvoidance
+            lidar_active = False
+            init_mode_params("o")
+            cooldown(1)
+            return
+
+    if cooldown():
+        robotDrive("STOP")
+        return
+
+    # Execute obstacle avoidance algorithm
+    if o_state_changed:
+        o_start_time = time.time()
+        o_state_changed = False
+        first_entrance_for_this_state = True
+
+    if o_state == 0:
+        if time.time() < o_start_time + (TURN_BASE_TIME*T):
+            robotDrive("TURN_LEFT")
+        else:
+            nextState("o")
+            return
+
+    elif o_state == 1:
+        # and time.time() < o_start_time + searchtengelen:
+        if r and r < obstacle_avoided_dist:
+            robotDrive("FORWARD")
+            if first_entrance_for_this_state:
+                o_down_start = time.time()
+        else:
+            nextState("o")
+            y = time.time() - o_down_start
+            return
+
+    elif o_state == 2:
+        if time.time() < o_start_time + (TURN_BASE_TIME*T):
+            robotDrive("TURN_RIGHT")
+        else:
+            nextState("o")
+            return
+
+    # Araya state ekle default bir süre gitsin (1 metre götürcek kadar mesela)
+    # x initialize et, yatay gittiğin yolu ölç [gerekirse]
+    elif o_state == 3:
+        if time.time() < o_start_time + FORWARD_BASE_TIME*T:
+            robotDrive("FORWARD")
+        else:
+            nextState("o", False)
+            return
+
+    elif o_state == 4:
+        # and time.time() < o_start_time + searchtengelen:
+        if r and r < obstacle_avoided_dist:
+            robotDrive("FORWARD")
+        else:
+            nextState("o")
+            return
+
+    elif o_state == 5:
+        if time.time() < o_start_time + (TURN_BASE_TIME*T):
+            robotDrive("TURN_RIGHT")
+        else:
+            nextState("o")
+            return
+
+    elif o_state == 6:
+        # and time.time() < o_start_time + searchtengelen:
+        if time.time() < o_start_time + y:
+            robotDrive("FORWARD")
+        else:
+            nextState("o")
+            return
+
+    elif o_state == 7:
+        if time.time() < o_start_time + (TURN_BASE_TIME*T):
+            robotDrive("TURN_LEFT")
+        else:
+            nextState("o")
+            MODE = Mode.Search
+            init_mode_params("o")
+            return
+
+
+def escape():
+    global e_state_changed, e_state, e_cntr, e_start_time, obstacle_seen_stop_distance, MODE, f, r, escape_started
+
+    if escape_started == 0:
+        escape_started = time.time()
+
+    if (f[1] and f[1] < obstacle_seen_stop_distance) or (f[0] and f[0] < side_obstacle_seen_stop_distance) or (f[2] and f[2] < side_obstacle_seen_stop_distance):
+        robotDrive("STOP")
+        MODE = Mode.ObstacleAvoidance
+        init_mode_params("o")
+        cooldown(1)
+        return
+
+
+    # Execute escape algorithm
+    if e_state_changed:
+        e_start_time = time.time()
+        e_state_changed = False
+
+    # Turn 180 degree
+    elif e_state == 0: 
+        if time.time() < e_start_time + 2*(TURN_BASE_TIME*T):
+            robotDrive("TURN_LEFT")
+        else:
+            nextState("e", False)
+            return
+
+    # Go forward as if there is no tomorrow
+    elif e_state == 1:
+        robotDrive("FORWARD")
+        return
+       
+
+def controller(center_x):
+    global MODE
+
+    # Adjust Mode
+    if center_x:
+        MODE = Mode.Escape
+
+    # Execute Mode
+    if MODE == Mode.Rush:
         rush(center_x)
+    elif MODE == Mode.ObstacleAvoidance:
+        obstacleAvoidance()
     else:
-        robotDrive('STOP')
+        robotDrive("STOP")
 
 
 while True:
-    redis_vals = client.mget(['center:x', 'f:dist'])
-    center_x, min_fdist = redis_vals[0], redis_vals[1]
-    center_x = None if center_x is None else float(center_x)
-    min_fdist = None if min_fdist is None else float(min_fdist)
-    controller(center_x, min_fdist)
+    if (escape_started != 0) and (escape_started >= time.time() + mission_complete_time):
+        robotDrive("STOP")
+    else:
+        redis_read()
+        controller(center_x)
